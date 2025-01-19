@@ -1,27 +1,72 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { MainNav } from "@/components/main-nav";
-import { Toaster } from "@/components/ui/toaster";
+import localFont from 'next/font/local'
+import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
+import { Navbar } from "@/components/navbar"
+import { Sidebar } from "@/components/sidebar"
 
-const inter = Inter({ subsets: ["latin"] });
+const acorn = localFont({
+  src: [
+    {
+      path: '../public/fonts/acorn.woff',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/acorn.woff',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/acorn.woff',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-acorn'
+})
 
-export const metadata: Metadata = {
-  title: "Supabase Auth + Next.js Demo",
-};
+const gt = localFont({
+  src: [
+    {
+      path: '../public/fonts/gt.woff',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/gt.woff',
+      weight: '500',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-gt'
+})
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <MainNav />
-        <main className="flex-1 p-10">{children}</main>
-        <Toaster />
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${acorn.variable} ${gt.variable} font-gt`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <div className="min-h-screen bg-gradient-to-br from-[#E8F3F1] via-[#F0F7F5] to-[#F8FAF9]">
+            <Navbar />
+            <div className="flex h-[calc(100vh-4rem)]">
+              <Sidebar />
+              <main className="flex-1 overflow-auto p-8">
+                {children}
+              </main>
+            </div>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }
+
