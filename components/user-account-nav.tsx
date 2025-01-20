@@ -14,7 +14,7 @@ import { SignInButton } from "@/components/signin-button";
 import { SignOutButton } from "@/components/signout-button";
 
 export async function UserAccountNav() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

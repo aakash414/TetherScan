@@ -13,7 +13,7 @@ type SupabaseJwtPayload = JWTPayload & {
 
 export async function getUserRole() {
   // Create a Supabase client for server-side operations
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Retrieve the current session
   const {

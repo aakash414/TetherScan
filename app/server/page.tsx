@@ -2,7 +2,7 @@ import { getUserRole } from "@/lib/get-user-role";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ServerPage() {
-  const supabase = createClient();
+  const supabase = await await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

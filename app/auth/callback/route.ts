@@ -12,7 +12,7 @@ export async function GET(request: Request) {
  
   if (code) {
     // Create a Supabase client
-    const supabase = createClient()
+    const supabase = await createClient()
  
     // Exchange the code for a session
     const { error } = await supabase.auth.exchangeCodeForSession(code)
