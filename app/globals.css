@@ -6,32 +6,32 @@
   :root {
     --background: 171 33% 96%;
     --foreground: 173 57% 24%;
-    
+
     --card: 0 0% 100%;
     --card-foreground: 173 57% 24%;
- 
+
     --popover: 0 0% 100%;
     --popover-foreground: 173 57% 24%;
- 
+
     --primary: 173 57% 24%;
     --primary-foreground: 171 33% 96%;
- 
+
     --secondary: 171 33% 96%;
     --secondary-foreground: 173 57% 24%;
- 
+
     --muted: 171 33% 96%;
     --muted-foreground: 173 57% 45%;
- 
+
     --accent: 171 33% 96%;
     --accent-foreground: 173 57% 24%;
- 
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
     --border: 173 57% 85%;
     --input: 173 57% 85%;
     --ring: 173 57% 24%;
- 
+
     --radius: 1rem;
   }
 }
@@ -43,7 +43,12 @@
   body {
     @apply bg-background text-foreground;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-acorn;
   }
 }
@@ -54,7 +59,39 @@
 }
 
 @keyframes twinkle {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.8; }
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out;
+}
