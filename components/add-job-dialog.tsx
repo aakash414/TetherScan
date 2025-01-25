@@ -96,7 +96,7 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger>
+            <DialogTrigger asChild>
                 <Button className="bg-[#006D77] hover:bg-[#006D77]/90">
                     <Plus className="mr-2 h-4 w-4" />
                     Add Job
