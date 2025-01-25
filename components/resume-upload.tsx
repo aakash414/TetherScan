@@ -2,6 +2,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Upload, Check } from "lucide-react"
+import { uploadResume, extractResumeText } from "@/lib/supabase/storage"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useToast } from "@/hooks/use-toast"
 
 interface ResumeUploadProps {
   onResumeData: (data: any) => void
@@ -10,26 +13,56 @@ interface ResumeUploadProps {
 }
 
 export function ResumeUpload({ onResumeData, uploadStatus, setUploadStatus }: ResumeUploadProps) {
+  const { toast } = useToast()
+  const supabase = createClientComponentClient()
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setUploadStatus("uploading")
+    try {
+      setUploadStatus("uploading")
 
-    // Simulate file upload and data extraction
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error("Not authenticated")
+      }
 
-    // Simulated extracted data
-    const extractedData = {
-      name: "John Doe",
-      email: "john.doe@example.com",
-      github: "https://github.com/johndoe",
-      linkedin: "https://www.linkedin.com/in/johndoe",
-      bio: "Experienced software developer with a passion for creating efficient and scalable applications.",
+      // Upload file to Supabase Storage
+      const fileUrl = await uploadResume(file, user.id)
+      
+      // Extract text from resume
+      const extractedText = await extractResumeText(file)
+
+      // Get user's Google profile data
+      const { email, user_metadata } = user
+      const name = user_metadata?.full_name || email?.split('@')[0] || ''
+
+      // Combine data
+      const extractedData = {
+        name,
+        email,
+        resume_url: fileUrl,
+        extracted_text: extractedText,
+      }
+
+      onResumeData(extractedData)
+      setUploadStatus("uploaded")
+      
+      toast({
+        title: "Success",
+        description: "Resume uploaded successfully",
+      })
+    } catch (error) {
+      console.error('Error uploading resume:', error)
+      setUploadStatus("idle")
+      toast({
+        title: "Error",
+        description: "Failed to upload resume",
+        variant: "destructive",
+      })
     }
-
-    onResumeData(extractedData)
-    setUploadStatus("uploaded")
   }
 
   return (
@@ -62,4 +95,3 @@ export function ResumeUpload({ onResumeData, uploadStatus, setUploadStatus }: Re
     </div>
   )
 }
-

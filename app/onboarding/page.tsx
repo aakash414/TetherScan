@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ResumeUpload } from "@/components/resume-upload"
 import { DecorativeStars } from "@/components/decorative-stars"
@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Plus, X } from "lucide-react"
 import { toast } from 'react-toastify'
 import { AutomaticProfile } from "@/components/automatic-profile"
+import { createClient } from '@/lib/supabase/client'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface WorkExperience {
   title: string;
@@ -19,35 +21,135 @@ interface WorkExperience {
   completed: boolean;
 }
 
+interface Education {
+  school: string;
+  degree: string;
+  field: string;
+  startDate: string;
+  endDate: string;
+  grade: string;
+  description: string;
+}
+
+interface Skill {
+  name: string;
+  proficiency: "beginner" | "intermediate" | "advanced";
+}
+
+interface Project {
+  name: string;
+  description: string;
+  githubUrl: string;
+  liveUrl: string;
+}
+
+interface VolunteerExperience {
+  organization: string;
+  role: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+}
+
+interface Certification {
+  name: string;
+  issuer: string;
+  issueDate: string;
+  expiryDate: string;
+  certificationId: string;
+  certificationUrl: string;
+}
+
+interface UserData {
+  name: string;
+  email: string;
+  github: string;
+  linkedin: string;
+  portfolio: string;
+  bio: string;
+  profile_image: string;
+  experiences: {
+    title: string;
+    company: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+  }[];
+  education: Education[];
+  skills: Skill[];
+  projects: Project[];
+  volunteer: VolunteerExperience[];
+  certifications: Certification[];
+  languages: string[];
+}
+
 export default function OnboardingPage() {
-  const [userData, setUserData] = useState({
+  const router = useRouter()
+  const supabase = createClient()
+
+  const [userData, setUserData] = useState<UserData>({
     name: "",
     email: "",
     github: "",
     linkedin: "",
     portfolio: "",
     bio: "",
-    experiences: [{ title: "", company: "", startDate: "", endDate: "", description: "" }],
-    education: [{ school: "", degree: "", field: "", graduationDate: "" }],
-    skills: [""],
-    projects: [{ name: "", description: "", technologies: "", link: "" }],
-    volunteer: [{ organization: "", role: "", duration: "", description: "" }],
-    certifications: [{ name: "", issuer: "", date: "" }],
-    languages: [""],
+    profile_image: "",
+    experiences: [{
+      title: "",
+      company: "",
+      startDate: "",
+      endDate: "",
+      description: ""
+    }],
+    education: [{
+      school: "",
+      degree: "",
+      field: "",
+      startDate: "",
+      endDate: "",
+      grade: "",
+      description: ""
+    }],
+    skills: [{
+      name: "",
+      proficiency: "intermediate"
+    }],
+    projects: [{
+      name: "",
+      description: "",
+      githubUrl: "",
+      liveUrl: ""
+    }],
+    volunteer: [{
+      organization: "",
+      role: "",
+      startDate: "",
+      endDate: "",
+      description: ""
+    }],
+    certifications: [{
+      name: "",
+      issuer: "",
+      issueDate: "",
+      expiryDate: "",
+      certificationId: "",
+      certificationUrl: ""
+    }],
+    languages: [""]
   })
   const [uploadStatus, setUploadStatus] = useState("idle")
   const [linkedInUrl, setLinkedInUrl] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
-  const router = useRouter()
   const [workExperiences, setWorkExperiences] = useState<WorkExperience[]>([])
-  const [currentExperience, setCurrentExperience] = useState<WorkExperience>({ 
-    title: '', 
-    company: '', 
-    completed: false 
+  const [currentExperience, setCurrentExperience] = useState<WorkExperience>({
+    title: '',
+    company: '',
+    completed: false
   })
 
-  const handleResumeData = (extractedData: Partial<typeof userData>) => {
+  const handleResumeData = (extractedData: Partial<UserData>) => {
     setUserData((prevData) => ({ ...prevData, ...extractedData }))
   }
 
@@ -55,31 +157,206 @@ export default function OnboardingPage() {
     setIsGenerating(true)
     setGenerationProgress(0)
 
-    for (let i = 0; i <= 100; i += 10) {
-      setGenerationProgress(i)
-      await new Promise((resolve) => setTimeout(resolve, 500))
-    }
+    try {
+      // Get current user
+      const { data: { user } } = await (await supabase).auth.getUser()
+      if (!user) {
+        throw new Error("Not authenticated")
+      }
 
-    triggerConfetti()
-    setIsGenerating(false)
-    router.push("/")
+      // Update progress
+      setGenerationProgress(10)
+
+      // Save or update user data
+      const supabaseClient = await supabase
+      const { error: userError } = await supabaseClient.from('users')
+        .upsert({
+          id: user.id,
+          name: userData.name || user.user_metadata?.full_name,
+          email: userData.email || user.email,
+          github_username: userData.github,
+          linkedin_id: userData.linkedin,
+          profile_image: user.user_metadata?.avatar_url,
+          updated_at: new Date().toISOString()
+        })
+
+      if (userError) throw userError
+
+      setGenerationProgress(30)
+
+      // Save work experiences
+      if (userData.experiences.length > 0) {
+        const { error: expError } = await supabaseClient
+          .from('work_experience')
+          .upsert(
+            userData.experiences.map(exp => ({
+              user_id: user.id,
+              company_name: exp.company,
+              role: exp.title,
+              start_date: exp.startDate,
+              end_date: exp.endDate,
+              description: exp.description,
+              updated_at: new Date().toISOString()
+            }))
+          )
+        if (expError) throw expError
+      }
+
+      setGenerationProgress(50)
+
+      // Save education
+      if (userData.education.length > 0) {
+        const { error: eduError } = await supabaseClient
+          .from('education')
+          .upsert(
+            userData.education.map(edu => ({
+              user_id: user.id,
+              institution_name: edu.school,
+              degree: edu.degree,
+              field_of_study: edu.field,
+              start_date: edu.startDate,
+              end_date: edu.endDate,
+              grade: edu.grade,
+              description: edu.description,
+              updated_at: new Date().toISOString()
+            }))
+          )
+        if (eduError) throw eduError
+      }
+
+      setGenerationProgress(60)
+
+      // Save skills
+      if (userData.skills.length > 0) {
+        const { error: skillError } = await supabaseClient
+          .from('skills')
+          .upsert(
+            userData.skills.map(skill => ({
+              user_id: user.id,
+              skill_name: skill.name,
+              proficiency: skill.proficiency,
+              updated_at: new Date().toISOString()
+            }))
+          )
+        if (skillError) throw skillError
+      }
+
+      setGenerationProgress(70)
+
+      // Save projects
+      if (userData.projects.length > 0) {
+        const { error: projError } = await supabaseClient
+          .from('projects')
+          .upsert(
+            userData.projects.map(proj => ({
+              user_id: user.id,
+              title: proj.name,
+              description: proj.description,
+              github_url: proj.githubUrl,
+              live_url: proj.liveUrl,
+              updated_at: new Date().toISOString()
+            }))
+          )
+        if (projError) throw projError
+      }
+
+      setGenerationProgress(80)
+
+      // Save volunteer experience
+      if (userData.volunteer.length > 0) {
+        const { error: volError } = await supabaseClient
+          .from('volunteer_experience')
+          .upsert(
+            userData.volunteer.map(vol => ({
+              user_id: user.id,
+              organization_name: vol.organization,
+              role: vol.role,
+              start_date: vol.startDate,
+              end_date: vol.endDate,
+              description: vol.description,
+              updated_at: new Date().toISOString()
+            }))
+          )
+        if (volError) throw volError
+      }
+
+      setGenerationProgress(90)
+
+      // Save certifications
+      if (userData.certifications.length > 0) {
+        const { error: certError } = await supabaseClient
+          .from('certifications')
+          .upsert(
+            userData.certifications.map(cert => ({
+              user_id: user.id,
+              certification_name: cert.name,
+              issuing_organization: cert.issuer,
+              issue_date: cert.issueDate,
+              expiry_date: cert.expiryDate,
+              certification_id: cert.certificationId,
+              certification_url: cert.certificationUrl,
+              updated_at: new Date().toISOString()
+            }))
+          )
+        if (certError) throw certError
+      }
+
+      setGenerationProgress(100)
+      toast.success("Profile created successfully!")
+
+      // Redirect to dashboard
+      router.push("/dashboard")
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      toast.error("Failed to create profile. Please try again.")
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
-  const addArrayField = (field: keyof typeof userData, emptyValue: any) => {
+  const completeLater = async () => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error("Not authenticated")
+      }
+
+      // Only save essential information
+      const { error: userError } = await supabase.from('users')
+        .upsert({
+          id: user.id,
+          name: userData.name || user.user_metadata?.full_name,
+          email: userData.email || user.email,
+          profile_image: user.user_metadata?.avatar_url,
+          updated_at: new Date().toISOString()
+        })
+
+      if (userError) throw userError
+
+      toast.success('Profile saved! You can complete it later.')
+      router.push('/dashboard')
+    } catch (error) {
+      console.error('Error:', error)
+      toast.error('Failed to save profile')
+    }
+  }
+
+  const addArrayField = (field: keyof UserData, emptyValue: any) => {
     setUserData((prev) => ({
       ...prev,
       [field]: [...(prev[field] as any[]), emptyValue],
     }))
   }
 
-  const removeArrayField = (field: keyof typeof userData, index: number) => {
+  const removeArrayField = (field: keyof UserData, index: number) => {
     setUserData((prev) => ({
       ...prev,
       [field]: (prev[field] as any[]).filter((_, i) => i !== index),
     }))
   }
 
-  const updateArrayField = (field: keyof typeof userData, index: number, value: any) => {
+  const updateArrayField = (field: keyof UserData, index: number, value: any) => {
     setUserData((prev) => ({
       ...prev,
       [field]: (prev[field] as any[]).map((item, i) => (i === index ? value : item)),
@@ -173,6 +450,40 @@ export default function OnboardingPage() {
     setCurrentExperience({ title: '', company: '', completed: false });
   };
 
+  const handleProjectChange = (index: number, field: keyof Project, value: string) => {
+    setUserData((prev) => ({
+      ...prev,
+      projects: prev.projects.map((project, i) => (i === index ? { ...project, [field]: value } : project)),
+    }))
+  }
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const { data: { user }, error } = await (await supabase).auth.getUser()
+
+        if (error) {
+          console.error('Error fetching user:', error)
+          return
+        }
+
+        if (user && user.user_metadata) {
+          setUserData(prevData => ({
+            ...prevData,
+            name: user.user_metadata.full_name || prevData.name,
+            email: user.email || prevData.email,
+            // If avatar_url exists in metadata, use it for profile image
+            profile_image: user.user_metadata.avatar_url || prevData.profile_image
+          }))
+        }
+      } catch (error) {
+        console.error('Error in fetchUserData:', error)
+      }
+    }
+
+    fetchUserData()
+  }, [])
+
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-[#E8F3F1] via-[#F0F7F5] to-[#F8FAF9] p-8">
       <DecorativeStars />
@@ -186,7 +497,7 @@ export default function OnboardingPage() {
               <TabsTrigger value="automatic">Automatic Setup</TabsTrigger>
               <TabsTrigger value="manual">Manual Setup</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="automatic">
               <AutomaticProfile
                 onResumeData={handleResumeData}
@@ -199,17 +510,33 @@ export default function OnboardingPage() {
               {/* Basic Information */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Basic Information</h3>
-                <Input
-                  placeholder="Full Name"
-                  value={userData.name}
-                  onChange={(e) => setUserData({ ...userData, name: e.target.value })}
-                />
-                <Input
-                  placeholder="Email"
-                  type="email"
-                  value={userData.email}
-                  onChange={(e) => setUserData({ ...userData, email: e.target.value })}
-                />
+                <div className="flex flex-col space-y-4 mt-4">
+                  <Input
+                    placeholder="Name"
+                    value={userData.name}
+                    onChange={(e) => setUserData({ ...userData, name: e.target.value })}
+                    required
+                  />
+                  <Input
+                    placeholder="Email"
+                    type="email"
+                    value={userData.email}
+                    onChange={(e) => setUserData({ ...userData, email: e.target.value })}
+                    required
+                  />
+                  <div className="flex space-x-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={completeLater}
+                      disabled={!userData.name || !userData.email}
+                    >
+                      Complete Later
+                    </Button>
+                    <Button onClick={() => handleGenerate()}>
+                      Complete Profile
+                    </Button>
+                  </div>
+                </div>
                 <Textarea
                   placeholder="Professional Summary"
                   value={userData.bio}
@@ -287,7 +614,10 @@ export default function OnboardingPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => addArrayField("skills", "")}
+                    onClick={() => addArrayField("skills", {
+                      name: "",
+                      proficiency: "intermediate"
+                    })}
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add Skill
                   </Button>
@@ -296,9 +626,25 @@ export default function OnboardingPage() {
                   <div key={index} className="flex gap-2">
                     <Input
                       placeholder="Skill"
-                      value={skill}
-                      onChange={(e) => updateArrayField("skills", index, e.target.value)}
+                      value={skill.name}
+                      onChange={(e) => updateArrayField("skills", index, { ...skill, name: e.target.value })}
+                      className="flex-1"
                     />
+                    <Select
+                      value={skill.proficiency}
+                      onValueChange={(value: "beginner" | "intermediate" | "advanced") =>
+                        updateArrayField("skills", index, { ...skill, proficiency: value })
+                      }
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select proficiency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="beginner">Beginner</SelectItem>
+                        <SelectItem value="intermediate">Intermediate</SelectItem>
+                        <SelectItem value="advanced">Advanced</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -317,14 +663,12 @@ export default function OnboardingPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      addArrayField("projects", {
-                        name: "",
-                        description: "",
-                        technologies: "",
-                        link: "",
-                      })
-                    }
+                    onClick={() => addArrayField("projects", {
+                      name: "",
+                      description: "",
+                      githubUrl: "",
+                      liveUrl: ""
+                    })}
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add Project
                   </Button>
@@ -343,34 +687,30 @@ export default function OnboardingPage() {
                       placeholder="Project Name"
                       value={project.name}
                       onChange={(e) =>
-                        updateArrayField("projects", index, { ...project, name: e.target.value })
+                        handleProjectChange(index, "name", e.target.value)
                       }
                     />
                     <Textarea
-                      placeholder="Description"
+                      placeholder="Project Description"
                       value={project.description}
                       onChange={(e) =>
-                        updateArrayField("projects", index, {
-                          ...project,
-                          description: e.target.value,
-                        })
+                        handleProjectChange(index, "description", e.target.value)
                       }
                     />
                     <Input
-                      placeholder="Technologies Used"
-                      value={project.technologies}
+                      placeholder="GitHub URL"
+                      type="url"
+                      value={project.githubUrl}
                       onChange={(e) =>
-                        updateArrayField("projects", index, {
-                          ...project,
-                          technologies: e.target.value,
-                        })
+                        handleProjectChange(index, "githubUrl", e.target.value)
                       }
                     />
                     <Input
-                      placeholder="Project Link"
-                      value={project.link}
+                      placeholder="Live Demo URL"
+                      type="url"
+                      value={project.liveUrl}
                       onChange={(e) =>
-                        updateArrayField("projects", index, { ...project, link: e.target.value })
+                        handleProjectChange(index, "liveUrl", e.target.value)
                       }
                     />
                   </div>
@@ -384,14 +724,15 @@ export default function OnboardingPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      addArrayField("education", {
-                        school: "",
-                        degree: "",
-                        field: "",
-                        graduationDate: "",
-                      })
-                    }
+                    onClick={() => addArrayField("education", {
+                      school: "",
+                      degree: "",
+                      field: "",
+                      startDate: "",
+                      endDate: "",
+                      grade: "",
+                      description: ""
+                    })}
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add Education
                   </Button>
@@ -407,7 +748,7 @@ export default function OnboardingPage() {
                       <X className="h-4 w-4" />
                     </Button>
                     <Input
-                      placeholder="School"
+                      placeholder="Institution Name"
                       value={edu.school}
                       onChange={(e) =>
                         updateArrayField("education", index, { ...edu, school: e.target.value })
@@ -427,14 +768,36 @@ export default function OnboardingPage() {
                         updateArrayField("education", index, { ...edu, field: e.target.value })
                       }
                     />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        placeholder="Start Date"
+                        value={edu.startDate}
+                        onChange={(e) =>
+                          updateArrayField("education", index, { ...edu, startDate: e.target.value })
+                        }
+                      />
+                      <Input
+                        type="date"
+                        placeholder="End Date"
+                        value={edu.endDate}
+                        onChange={(e) =>
+                          updateArrayField("education", index, { ...edu, endDate: e.target.value })
+                        }
+                      />
+                    </div>
                     <Input
-                      type="date"
-                      value={edu.graduationDate}
+                      placeholder="Grade/GPA"
+                      value={edu.grade}
                       onChange={(e) =>
-                        updateArrayField("education", index, {
-                          ...edu,
-                          graduationDate: e.target.value,
-                        })
+                        updateArrayField("education", index, { ...edu, grade: e.target.value })
+                      }
+                    />
+                    <Textarea
+                      placeholder="Description (e.g., thesis details, achievements)"
+                      value={edu.description}
+                      onChange={(e) =>
+                        updateArrayField("education", index, { ...edu, description: e.target.value })
                       }
                     />
                   </div>
@@ -452,8 +815,9 @@ export default function OnboardingPage() {
                       addArrayField("volunteer", {
                         organization: "",
                         role: "",
-                        duration: "",
-                        description: "",
+                        startDate: "",
+                        endDate: "",
+                        description: ""
                       })
                     }
                   >
@@ -487,18 +851,109 @@ export default function OnboardingPage() {
                         updateArrayField("volunteer", index, { ...vol, role: e.target.value })
                       }
                     />
-                    <Input
-                      placeholder="Duration"
-                      value={vol.duration}
-                      onChange={(e) =>
-                        updateArrayField("volunteer", index, { ...vol, duration: e.target.value })
-                      }
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        placeholder="Start Date"
+                        value={vol.startDate}
+                        onChange={(e) =>
+                          updateArrayField("volunteer", index, { ...vol, startDate: e.target.value })
+                        }
+                      />
+                      <Input
+                        type="date"
+                        placeholder="End Date"
+                        value={vol.endDate}
+                        onChange={(e) =>
+                          updateArrayField("volunteer", index, { ...vol, endDate: e.target.value })
+                        }
+                      />
+                    </div>
                     <Textarea
                       placeholder="Description"
                       value={vol.description}
                       onChange={(e) =>
                         updateArrayField("volunteer", index, { ...vol, description: e.target.value })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Certifications */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">Certifications</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addArrayField("certifications", {
+                      name: "",
+                      issuer: "",
+                      issueDate: "",
+                      expiryDate: "",
+                      certificationId: "",
+                      certificationUrl: ""
+                    })}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Certification
+                  </Button>
+                </div>
+                {userData.certifications.map((cert, index) => (
+                  <div key={index} className="space-y-2 p-4 border rounded-lg relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 top-2"
+                      onClick={() => removeArrayField("certifications", index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      placeholder="Certification Name"
+                      value={cert.name}
+                      onChange={(e) =>
+                        updateArrayField("certifications", index, { ...cert, name: e.target.value })
+                      }
+                    />
+                    <Input
+                      placeholder="Issuing Organization"
+                      value={cert.issuer}
+                      onChange={(e) =>
+                        updateArrayField("certifications", index, { ...cert, issuer: e.target.value })
+                      }
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        placeholder="Issue Date"
+                        value={cert.issueDate}
+                        onChange={(e) =>
+                          updateArrayField("certifications", index, { ...cert, issueDate: e.target.value })
+                        }
+                      />
+                      <Input
+                        type="date"
+                        placeholder="Expiry Date (if applicable)"
+                        value={cert.expiryDate}
+                        onChange={(e) =>
+                          updateArrayField("certifications", index, { ...cert, expiryDate: e.target.value })
+                        }
+                      />
+                    </div>
+                    <Input
+                      placeholder="Certification ID"
+                      value={cert.certificationId}
+                      onChange={(e) =>
+                        updateArrayField("certifications", index, { ...cert, certificationId: e.target.value })
+                      }
+                    />
+                    <Input
+                      placeholder="Certification URL"
+                      type="url"
+                      value={cert.certificationUrl}
+                      onChange={(e) =>
+                        updateArrayField("certifications", index, { ...cert, certificationUrl: e.target.value })
                       }
                     />
                   </div>
