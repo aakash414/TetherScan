@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
+import { createClient } from '@/lib/supabase/client'
 export default function ProfilePage() {
   const [user, setUser] = useState<{
     id: string
@@ -15,7 +14,7 @@ export default function ProfilePage() {
     created_at: string
   } | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => {
@@ -30,7 +29,8 @@ export default function ProfilePage() {
         }
 
         // Check if user exists in our users table
-        const { data: userData, error: dbError } = await supabase
+        const supabaseClient = await supabase
+        const { data: userData, error: dbError } = await supabaseClient
           .from('users')
           .select('*')
           .eq('email', authUser.email)
@@ -48,7 +48,7 @@ export default function ProfilePage() {
             name: authUser.user_metadata.full_name || authUser.email?.split('@')[0] || 'Anonymous',
           }
 
-          const { data: insertedUser, error: insertError } = await supabase
+          const { data: insertedUser, error: insertError } = await supabaseClient
             .from('users')
             .insert([newUser])
             .select()

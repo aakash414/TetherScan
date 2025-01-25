@@ -482,7 +482,7 @@ export default function OnboardingPage() {
     }
 
     fetchUserData()
-  }, [])
+  }, [supabase])
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-[#E8F3F1] via-[#F0F7F5] to-[#F8FAF9] p-8">
@@ -525,8 +525,8 @@ export default function OnboardingPage() {
                     required
                   />
                   <div className="flex space-x-4">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={completeLater}
                       disabled={!userData.name || !userData.email}
                     >

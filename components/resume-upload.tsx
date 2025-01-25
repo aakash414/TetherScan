@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Upload, Check } from "lucide-react"
 import { uploadResume, extractResumeText } from "@/lib/supabase/storage"
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 
 interface ResumeUploadProps {
@@ -14,7 +14,7 @@ interface ResumeUploadProps {
 
 export function ResumeUpload({ onResumeData, uploadStatus, setUploadStatus }: ResumeUploadProps) {
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -31,7 +31,7 @@ export function ResumeUpload({ onResumeData, uploadStatus, setUploadStatus }: Re
 
       // Upload file to Supabase Storage
       const fileUrl = await uploadResume(file, user.id)
-      
+
       // Extract text from resume
       const extractedText = await extractResumeText(file)
 
@@ -49,7 +49,7 @@ export function ResumeUpload({ onResumeData, uploadStatus, setUploadStatus }: Re
 
       onResumeData(extractedData)
       setUploadStatus("uploaded")
-      
+
       toast({
         title: "Success",
         description: "Resume uploaded successfully",
@@ -81,9 +81,8 @@ export function ResumeUpload({ onResumeData, uploadStatus, setUploadStatus }: Re
         />
         <Label
           htmlFor="resume-upload"
-          className={`flex cursor-pointer items-center space-x-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300 ${
-            uploadStatus === "uploaded" ? "bg-green-100" : ""
-          }`}
+          className={`flex cursor-pointer items-center space-x-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300 ${uploadStatus === "uploaded" ? "bg-green-100" : ""
+            }`}
         >
           {uploadStatus === "uploaded" ? <Check className="h-4 w-4 text-green-600" /> : <Upload className="h-4 w-4" />}
           <span>{uploadStatus === "uploaded" ? "Resume uploaded" : "Choose file"}</span>

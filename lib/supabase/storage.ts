@@ -1,7 +1,7 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from "@/lib/supabase/client"
 
 export async function uploadResume(file: File, userId: string) {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const fileExt = file.name.split('.').pop()
   const fileName = `${userId}-${Date.now()}.${fileExt}`
 
@@ -23,7 +23,7 @@ export async function uploadResume(file: File, userId: string) {
 export async function extractResumeText(file: File): Promise<string> {
   const formData = new FormData()
   formData.append('file', file)
-  
+
   // You would implement your own resume parsing service here
   // For now, we'll return an empty string
   return ''
