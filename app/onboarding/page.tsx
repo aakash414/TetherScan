@@ -14,6 +14,7 @@ import { toast } from 'react-toastify'
 import { AutomaticProfile } from "@/components/automatic-profile"
 import { createClient } from '@/lib/supabase/client'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import * as pdfjsLib from 'pdfjs-dist';
 
 interface WorkExperience {
   title: string;
@@ -153,28 +154,49 @@ export default function OnboardingPage() {
     setUserData((prevData) => ({ ...prevData, ...extractedData }))
   }
 
-  const handleResumeParsing = async (extractedText: string) => {
+  const handleResumeParsing = async (file: File) => {
     try {
-      const response = await fetch('https://api.gemini.com/parse', { // Replace with actual Gemini API endpoint
+      setUploadStatus('parsing');
+      
+      // Step 1: Convert PDF to text
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + ' ';
+      }
+
+      // Step 2: Send text to Gemini API
+      const response = await fetch('/api/parse-resume', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer YOUR_API_KEY` // Replace with your actual API key
         },
-        body: JSON.stringify({ text: extractedText })
+        body: JSON.stringify({ resumeText: fullText }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to parse resume');
       }
 
-      const parsedData = await response.json();
-      handleResumeData(parsedData); // Update userData with parsed data
+      const { parsedData } = await response.json();
+      
+      // Step 3: Parse the response and update userData
+      const resumeData = JSON.parse(parsedData);
+      handleResumeData(resumeData);
+      
+      setUploadStatus('success');
+      toast.success('Resume parsed successfully!');
     } catch (error) {
       console.error('Error parsing resume:', error);
-      toast.error("Failed to parse resume. Please try again.");
+      setUploadStatus('error');
+      toast.error('Failed to parse resume. Please try again.');
     }
-  }
+  };
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -182,17 +204,15 @@ export default function OnboardingPage() {
 
     try {
       // Get current user
-      const { data: { user } } = await (await supabase).auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         throw new Error("Not authenticated")
       }
 
-      // Update progress
       setGenerationProgress(10)
 
       // Save or update user data
-      const supabaseClient = await supabase
-      const { error: userError } = await supabaseClient.from('users')
+      const { error: userError } = await supabase.from('users')
         .upsert({
           id: user.id,
           name: userData.name || user.user_metadata?.full_name,
@@ -209,15 +229,15 @@ export default function OnboardingPage() {
 
       // Save work experiences
       if (userData.experiences.length > 0) {
-        const { error: expError } = await supabaseClient
+        const { error: expError } = await supabase
           .from('work_experience')
           .upsert(
             userData.experiences.map(exp => ({
               user_id: user.id,
               company_name: exp.company,
               role: exp.title,
-              start_date: exp.startDate,
-              end_date: exp.endDate,
+              start_date: formatDate(exp.startDate),
+              end_date: exp.endDate === 'Present' ? null : formatDate(exp.endDate),
               description: exp.description,
               updated_at: new Date().toISOString()
             }))
@@ -229,7 +249,7 @@ export default function OnboardingPage() {
 
       // Save education
       if (userData.education.length > 0) {
-        const { error: eduError } = await supabaseClient
+        const { error: eduError } = await supabase
           .from('education')
           .upsert(
             userData.education.map(edu => ({
@@ -251,7 +271,7 @@ export default function OnboardingPage() {
 
       // Save skills
       if (userData.skills.length > 0) {
-        const { error: skillError } = await supabaseClient
+        const { error: skillError } = await supabase
           .from('skills')
           .upsert(
             userData.skills.map(skill => ({
@@ -268,7 +288,7 @@ export default function OnboardingPage() {
 
       // Save projects
       if (userData.projects.length > 0) {
-        const { error: projError } = await supabaseClient
+        const { error: projError } = await supabase
           .from('projects')
           .upsert(
             userData.projects.map(proj => ({
@@ -287,7 +307,7 @@ export default function OnboardingPage() {
 
       // Save volunteer experience
       if (userData.volunteer.length > 0) {
-        const { error: volError } = await supabaseClient
+        const { error: volError } = await supabase
           .from('volunteer_experience')
           .upsert(
             userData.volunteer.map(vol => ({
@@ -307,7 +327,7 @@ export default function OnboardingPage() {
 
       // Save certifications
       if (userData.certifications.length > 0) {
-        const { error: certError } = await supabaseClient
+        const { error: certError } = await supabase
           .from('certifications')
           .upsert(
             userData.certifications.map(cert => ({
@@ -506,6 +526,23 @@ export default function OnboardingPage() {
 
     fetchUserData()
   }, [supabase])
+
+  // Helper function to format dates
+  const formatDate = (dateStr: string) => {
+    if (!dateStr || dateStr === 'Present') return null;
+    
+    // Handle month year format (e.g., "January 2024")
+    if (dateStr.includes(' ')) {
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+      return null;
+    }
+    
+    // Handle ISO date format
+    return dateStr;
+  };
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-[#E8F3F1] via-[#F0F7F5] to-[#F8FAF9] p-8">

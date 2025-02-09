@@ -2,6 +2,7 @@
 
 // Inspired by react-hot-toast library
 import * as React from "react"
+import { createContext, useContext } from 'react';
 
 import type {
   ToastActionElement,
@@ -158,7 +159,7 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
-      onOpenChange: (open) => {
+      onOpenChange: (open: boolean) => {
         if (!open) dismiss()
       },
     },
@@ -186,7 +187,22 @@ function useToast() {
 
   return {
     ...state,
-    toast,
+    toast: {
+      ...toast,
+      error: (message: string) => {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: message,
+        })
+      },
+      success: (message: string) => {
+        toast({
+          title: "Success",
+          description: message,
+        })
+      },
+    },
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
 }
