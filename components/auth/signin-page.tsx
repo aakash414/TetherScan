@@ -2,21 +2,18 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createBrowserClient } from '@supabase/ssr'
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/icons'
+import { createClient } from '@/lib/supabase/client'
 
 export default function SignInPage() {
   const router = useRouter()
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
+      const { data:{user} } = await supabase.auth.getUser()
+      if (user) {
         router.push('/')
       }
     }
@@ -31,7 +28,10 @@ export default function SignInPage() {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       })
-      if (error) throw error
+      if (error) {
+        console.error('Sign-in error:', error.message)
+        throw error
+      }
     } catch (error) {
       console.error('Error signing in:', error)
     }

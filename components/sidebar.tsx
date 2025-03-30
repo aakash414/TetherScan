@@ -1,7 +1,10 @@
+"use client"
+
 import { BarChart2, BriefcaseIcon, FileText, FolderGit2, Home } from 'lucide-react'
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useAuth } from '@/contexts/auth-context'
 
 const routes = [
   { name: "Dashboard", path: "/", icon: Home },
@@ -12,6 +15,12 @@ const routes = [
 ]
 
 export function Sidebar() {
+  const { user } = useAuth()
+  
+  if (!user) {
+    return null; // Don't render sidebar if user is not authenticated
+  }
+
   return (
     <aside className="w-64 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <nav className="flex flex-col gap-2 p-4">

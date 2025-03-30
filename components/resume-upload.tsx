@@ -7,6 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UserData } from '@/types/user'; // You'll need to create this type
+import { createClient } from '@/lib/supabase/client';
+
+const supabase = createClient();
+const { data: user } = await supabase.auth.getUser();
+console.log(user, 'user');
 
 // Update worker configuration
 if (typeof window !== 'undefined') {
@@ -21,14 +26,29 @@ interface ResumeUploadProps {
 }
 
 export function ResumeUpload({ 
-  userData, 
+  userData = {
+    name: "",
+    email: "",
+    github: "",
+    linkedin: "",
+    bio: "",
+    experiences: [],
+    education: [],
+    skills: [],
+    projects: [],
+    volunteer: [],
+    certifications: [],
+    languages: []
+  }, 
   onUpdateUserData, 
   uploadStatus, 
   setUploadStatus 
 }: ResumeUploadProps) {
   const { toast } = useToast();
+  
+  console.log(userData, 'userData');
 
-  const handleResumeParsing = async (file: File) => {
+  const handleResumeParsing = useCallback(async (file: File) => {
     try {
       setUploadStatus('parsing');
       
@@ -90,7 +110,7 @@ export function ResumeUpload({
       setUploadStatus('error');
       toast.error('Failed to parse resume. Please try again.');
     }
-  };
+  }, [onUpdateUserData, setUploadStatus, toast, userData]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -106,7 +126,7 @@ export function ResumeUpload({
     } else {
       toast.error('Please upload a PDF file');
     }
-  }, []);
+  }, [handleResumeParsing, setUploadStatus, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

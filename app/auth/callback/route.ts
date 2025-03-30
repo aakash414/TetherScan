@@ -19,14 +19,14 @@ export async function GET(request: Request) {
 
     if (!error) {
       // Get the user session
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: {user} } = await supabase.auth.getUser()
 
-      if (session) {
+      if (user) {
         // Check if user exists in our users table
         const { data: existingUser } = await supabase
           .from('users')
           .select('id')
-          .eq('id', session.user.id)
+          .eq('id', user.id)
           .single()
 
         if (!existingUser) {

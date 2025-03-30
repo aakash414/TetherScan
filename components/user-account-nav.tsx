@@ -1,80 +1,70 @@
+"use client"
+
 import React from "react";
 import { FaUser } from "react-icons/fa6";
 import Link from "next/link";
-
-import { createClient } from "@/lib/supabase/server";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SignInButton } from "@/components/signin-button";
 import { SignOutButton } from "@/components/signout-button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 
-export async function UserAccountNav() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export function UserAccountNav({ user }: { user: User | null }) {
+  const router = useRouter();
+  const supabase = createClient();
 
-  // Get user profile data if user exists
-  const { data: profile } = user
-    ? await supabase
-        .from('users')
-        .select('name, profile_image')
-        .eq('id', user.id)
-        .single()
-    : { data: null };
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/signin");
+    router.refresh();
+  };
 
   if (!user) {
     return <SignInButton />;
   }
 
-  const userInitial = profile?.name 
-    ? profile.name.charAt(0).toUpperCase()
-    : user.email?.charAt(0).toUpperCase() || 'U';
-
   return (
-    <div className="w-max space-x-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center space-x-1">
-          <Avatar>
-            <AvatarImage 
-              src={profile?.profile_image || user.user_metadata?.avatar_url} 
-              alt={profile?.name || user.email || "User"} 
-            />
-            <AvatarFallback>{userInitial}</AvatarFallback>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.full_name || "User"} />
+            <AvatarFallback>{user.user_metadata?.full_name?.charAt(0) || "U"}</AvatarFallback>
           </Avatar>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <div className="flex items-center justify-start gap-2 p-2">
-            <div className="flex flex-col space-y-1 leading-none">
-              {profile?.name && (
-                <p className="font-medium">{profile.name}</p>
-              )}
-              {user.email && (
-                <p className="text-muted-foreground w-[200px] truncate text-sm">
-                  {user.email}
-                </p>
-              )}
-            </div>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || "User"}</p>
+            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
           </div>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href="/profile">Profile</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/settings">Settings</Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className="cursor-pointer">
-            <SignOutButton />
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/dashboard")}>
+          Dashboard
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/profile")}>
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/settings")}>
+          Settings
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut}>
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -8,7 +8,7 @@ export function useSupabaseUser() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      setUser(user ?? null)
       setLoading(false)
     })
 

@@ -62,17 +62,10 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
                 jobDescription: "",
                 notes: "",
             })
-            toast({
-                title: "Success",
-                description: "Job added successfully",
-            })
+            toast.success("Job added successfully")
         } catch (error) {
             console.error('Error submitting form:', error)
-            toast({
-                title: "Error",
-                description: "Failed to add job",
-                variant: "destructive",
-            })
+            toast.error("Failed to add job")
         }
     }
 
@@ -80,17 +73,10 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
         try {
             // Implement URL scraping logic here
             console.log("Scraping URL:", formData.jobUrl)
-            toast({
-                title: "Info",
-                description: "URL scraping not implemented yet",
-            })
+            // toast.info("URL scraping not implemented yet")
         } catch (error) {
             console.error('Error scraping URL:', error)
-            toast({
-                title: "Error",
-                description: "Failed to scrape URL",
-                variant: "destructive",
-            })
+            toast.error("Failed to scrape URL")
         }
     }
 

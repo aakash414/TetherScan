@@ -15,6 +15,7 @@ import { AutomaticProfile } from "@/components/automatic-profile"
 import { createClient } from '@/lib/supabase/client'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import * as pdfjsLib from 'pdfjs-dist';
+import { TextItem } from 'pdfjs-dist/types/src/display/api';
 
 interface WorkExperience {
   title: string;
@@ -166,11 +167,20 @@ export default function OnboardingPage() {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        const pageText = textContent.items
+          .filter((item): item is TextItem => 
+            'str' in item && typeof item.str === 'string'
+          )
+          .map(item => item.str)
+          .join(' ');
         fullText += pageText + ' ';
       }
 
-      // Step 2: Send text to Gemini API
+      if (!fullText.trim()) {
+        throw new Error('No text content found in PDF');
+      }
+
+      // Step 2: Send text to API
       const response = await fetch('/api/parse-resume', {
         method: 'POST',
         headers: {
@@ -180,21 +190,30 @@ export default function OnboardingPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to parse resume');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to parse resume: ${response.status}`);
       }
 
       const { parsedData } = await response.json();
       
-      // Step 3: Parse the response and update userData
-      const resumeData = JSON.parse(parsedData);
-      handleResumeData(resumeData);
-      
-      setUploadStatus('success');
-      toast.success('Resume parsed successfully!');
+      // Step 3: Validate and parse the response
+      if (!parsedData) {
+        throw new Error('No parsed data received from API');
+      }
+
+      try {
+        const resumeData = JSON.parse(parsedData);
+        handleResumeData(resumeData);
+        setUploadStatus('success');
+        toast.success('Resume parsed successfully!');
+      } catch (parseError) {
+        throw new Error('Invalid JSON data received from API');
+      }
+
     } catch (error) {
       console.error('Error parsing resume:', error);
       setUploadStatus('error');
-      toast.error('Failed to parse resume. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to parse resume. Please try again.');
     }
   };
 
@@ -560,6 +579,7 @@ export default function OnboardingPage() {
 
             <TabsContent value="automatic">
               <AutomaticProfile
+                userData={userData}
                 onResumeData={handleResumeData}
                 uploadStatus={uploadStatus}
                 setUploadStatus={setUploadStatus}

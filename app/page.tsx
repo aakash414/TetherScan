@@ -1,10 +1,20 @@
-import { JobBoard } from "@/components/job-board"
-import { StatsCards } from "@/components/stats-cards"
-import { ResumeAnalytics } from "@/components/resume-analytics"
-import { DecorativeStars } from "@/components/decorative-stars"
+"use client"
 
-export default function DashboardPage() {
-  return (
+import { useAuth } from '@/contexts/auth-context'
+import LandingPage from './landing/page'
+import { DecorativeStars } from "@/components/decorative-stars"
+import { StatsCards } from "@/components/stats-cards"
+import { JobBoard } from "@/components/job-board"
+import { ResumeAnalytics } from "@/components/resume-analytics"
+
+export default function Home() {
+  const { user, loading } = useAuth()
+  
+  if (loading) {
+    return <div>Loading...</div>
+  }
+  
+  return user ? (
     <div className="relative space-y-8">
       <DecorativeStars />
       <div className="flex items-center justify-between">
@@ -21,6 +31,6 @@ export default function DashboardPage() {
         <ResumeAnalytics />
       </div>
     </div>
-  )
+  ) : <LandingPage />
 }
 

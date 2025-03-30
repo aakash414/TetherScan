@@ -21,10 +21,8 @@ export function useUser() {
   useEffect(() => {
     async function fetchUser() {
       try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
+        const { data } = await supabase.auth.getSession();
+        const session = data.session;      
         if (error) throw error;
 
         if (session) {
