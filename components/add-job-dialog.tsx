@@ -88,14 +88,14 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
                     Add Job
                 </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg w-full max-h-[80vh] p-4">
                 <DialogHeader>
                     <DialogTitle>Add New Job</DialogTitle>
                     <DialogDescription>
                         Add a new job to your board. You can either enter the details manually or provide a job listing URL.
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto max-h-[65vh]">
                     <RadioGroup defaultValue="manual" onValueChange={(value) => setInputMethod(value as "manual" | "url")} className="flex space-x-4">
                         <div className="flex items-center space-x-2">
                             <RadioGroupItem value="manual" id="manual" />
@@ -136,23 +136,27 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="location">Location</Label>
-                            <Input
-                                id="location"
-                                name="location"
-                                value={formData.location}
-                                onChange={handleInputChange}
-                            />
-                        </div>
-                        <div className="flex flex-col space-y-2">
-                            <Label htmlFor="remote">Remote</Label>
-                            <div className="h-10 flex items-center">
-                                <Switch
-                                    id="remote"
-                                    checked={formData.remote}
-                                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, remote: checked }))}
-                                />
+                            <div className="space-y-2">
+                                <Label htmlFor="remote">Remote</Label>
+                                <div className="h-10 flex items-center">
+                                    <Switch
+                                        id="remote"
+                                        checked={formData.remote}
+                                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, remote: checked }))}
+                                    />
+                                </div>
                             </div>
+                            {!formData.remote && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="location">Location</Label>
+                                    <Input
+                                        id="location"
+                                        name="location"
+                                        value={formData.location}
+                                        onChange={handleInputChange}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 

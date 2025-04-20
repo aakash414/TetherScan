@@ -22,7 +22,7 @@ export function AutomaticProfile({ userData, onResumeData, uploadStatus, setUplo
         <TabsTrigger value="resume">Upload Resume</TabsTrigger>
         <TabsTrigger value="linkedin">LinkedIn Profile</TabsTrigger>
       </TabsList>
-      
+
       <TabsContent value="resume">
         <ResumeUpload
           userData={userData}
@@ -31,7 +31,7 @@ export function AutomaticProfile({ userData, onResumeData, uploadStatus, setUplo
           setUploadStatus={setUploadStatus}
         />
       </TabsContent>
-      
+
       <TabsContent value="linkedin">
         <div className="space-y-4">
           <Input

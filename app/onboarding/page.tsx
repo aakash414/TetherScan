@@ -13,6 +13,17 @@ import { Plus, X } from "lucide-react"
 import { toast } from 'react-toastify'
 import { AutomaticProfile } from "@/components/automatic-profile"
 import { createClient } from '@/lib/supabase/client'
+import {
+  upsertUserProfile,
+  upsertExperiences,
+  upsertEducation,
+  upsertSkills,
+  upsertProjects,
+  upsertVolunteer,
+  upsertCertifications,
+
+} from '@/lib/supabase/services/profile'
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import * as pdfjsLib from 'pdfjs-dist';
 import { TextItem } from 'pdfjs-dist/types/src/display/api';
@@ -151,24 +162,110 @@ export default function OnboardingPage() {
     completed: false
   })
 
+  // Deduplication helpers
+  function isSameExperience(a: any, b: any) {
+    return (
+      a.title === b.title &&
+      a.company === b.company &&
+      a.startDate === b.startDate &&
+      a.endDate === b.endDate &&
+      a.description === b.description
+    );
+  }
+  function isSameEducation(a: any, b: any) {
+    return (
+      a.school === b.school &&
+      a.degree === b.degree &&
+      a.field === b.field &&
+      a.startDate === b.startDate &&
+      a.endDate === b.endDate &&
+      a.grade === b.grade &&
+      a.description === b.description
+    );
+  }
+  function isSameSkill(a: any, b: any) {
+    return a.name === b.name && a.proficiency === b.proficiency;
+  }
+  function isSameProject(a: any, b: any) {
+    return (
+      a.name === b.name &&
+      a.description === b.description &&
+      a.githubUrl === b.githubUrl &&
+      a.liveUrl === b.liveUrl
+    );
+  }
+  function isSameVolunteer(a: any, b: any) {
+    return (
+      a.organization === b.organization &&
+      a.role === b.role &&
+      a.startDate === b.startDate &&
+      a.endDate === b.endDate &&
+      a.description === b.description
+    );
+  }
+  function isSameCertification(a: any, b: any) {
+    return (
+      a.name === b.name &&
+      a.issuer === b.issuer &&
+      a.issueDate === b.issueDate &&
+      a.expiryDate === b.expiryDate &&
+      a.certificationId === b.certificationId &&
+      a.certificationUrl === b.certificationUrl
+    );
+  }
+  function dedupeArray(existing: any[], incoming: any[], isDuplicate: (a: any, b: any) => boolean) {
+    return [
+      ...existing,
+      ...incoming.filter(newItem => !existing.some(existingItem => isDuplicate(existingItem, newItem)))
+    ];
+  }
+  function dedupeLanguages(existing: string[], incoming: string[]) {
+    return Array.from(new Set([...existing, ...incoming].filter(l => l && l.trim() !== "")));
+  }
+
   const handleResumeData = (extractedData: Partial<UserData>) => {
-    setUserData((prevData) => ({ ...prevData, ...extractedData }))
+    setUserData((prevData) => ({
+      ...prevData,
+      experiences: extractedData.experiences
+        ? dedupeArray(prevData.experiences, extractedData.experiences, isSameExperience)
+        : prevData.experiences,
+      education: extractedData.education
+        ? dedupeArray(prevData.education, extractedData.education, isSameEducation)
+        : prevData.education,
+      skills: extractedData.skills
+        ? dedupeArray(prevData.skills, extractedData.skills, isSameSkill)
+        : prevData.skills,
+      projects: extractedData.projects
+        ? dedupeArray(prevData.projects, extractedData.projects, isSameProject)
+        : prevData.projects,
+      volunteer: extractedData.volunteer
+        ? dedupeArray(prevData.volunteer, extractedData.volunteer, isSameVolunteer)
+        : prevData.volunteer,
+      certifications: extractedData.certifications
+        ? dedupeArray(prevData.certifications, extractedData.certifications, isSameCertification)
+        : prevData.certifications,
+      languages: extractedData.languages
+        ? dedupeLanguages(prevData.languages, extractedData.languages)
+        : prevData.languages,
+      // merge other fields as before
+      ...extractedData,
+    }))
   }
 
   const handleResumeParsing = async (file: File) => {
     try {
       setUploadStatus('parsing');
-      
+
       // Step 1: Convert PDF to text
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       let fullText = '';
-      
+
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
-          .filter((item): item is TextItem => 
+          .filter((item): item is TextItem =>
             'str' in item && typeof item.str === 'string'
           )
           .map(item => item.str)
@@ -195,7 +292,7 @@ export default function OnboardingPage() {
       }
 
       const { parsedData } = await response.json();
-      
+
       // Step 3: Validate and parse the response
       if (!parsedData) {
         throw new Error('No parsed data received from API');
@@ -231,36 +328,14 @@ export default function OnboardingPage() {
       setGenerationProgress(10)
 
       // Save or update user data
-      const { error: userError } = await supabase.from('users')
-        .upsert({
-          id: user.id,
-          name: userData.name || user.user_metadata?.full_name,
-          email: userData.email || user.email,
-          github_username: userData.github,
-          linkedin_id: userData.linkedin,
-          profile_image: user.user_metadata?.avatar_url,
-          updated_at: new Date().toISOString()
-        })
-
+      const { error: userError } = await upsertUserProfile(user, userData)
       if (userError) throw userError
 
       setGenerationProgress(30)
 
       // Save work experiences
       if (userData.experiences.length > 0) {
-        const { error: expError } = await supabase
-          .from('work_experience')
-          .upsert(
-            userData.experiences.map(exp => ({
-              user_id: user.id,
-              company_name: exp.company,
-              role: exp.title,
-              start_date: formatDate(exp.startDate),
-              end_date: exp.endDate === 'Present' ? null : formatDate(exp.endDate),
-              description: exp.description,
-              updated_at: new Date().toISOString()
-            }))
-          )
+        const { error: expError } = await upsertExperiences(user, userData.experiences)
         if (expError) throw expError
       }
 
@@ -268,21 +343,7 @@ export default function OnboardingPage() {
 
       // Save education
       if (userData.education.length > 0) {
-        const { error: eduError } = await supabase
-          .from('education')
-          .upsert(
-            userData.education.map(edu => ({
-              user_id: user.id,
-              institution_name: edu.school,
-              degree: edu.degree,
-              field_of_study: edu.field,
-              start_date: edu.startDate,
-              end_date: edu.endDate,
-              grade: edu.grade,
-              description: edu.description,
-              updated_at: new Date().toISOString()
-            }))
-          )
+        const { error: eduError } = await upsertEducation(user, userData.education)
         if (eduError) throw eduError
       }
 
@@ -290,16 +351,7 @@ export default function OnboardingPage() {
 
       // Save skills
       if (userData.skills.length > 0) {
-        const { error: skillError } = await supabase
-          .from('skills')
-          .upsert(
-            userData.skills.map(skill => ({
-              user_id: user.id,
-              skill_name: skill.name,
-              proficiency: skill.proficiency,
-              updated_at: new Date().toISOString()
-            }))
-          )
+        const { error: skillError } = await upsertSkills(user, userData.skills)
         if (skillError) throw skillError
       }
 
@@ -307,18 +359,7 @@ export default function OnboardingPage() {
 
       // Save projects
       if (userData.projects.length > 0) {
-        const { error: projError } = await supabase
-          .from('projects')
-          .upsert(
-            userData.projects.map(proj => ({
-              user_id: user.id,
-              title: proj.name,
-              description: proj.description,
-              github_url: proj.githubUrl,
-              live_url: proj.liveUrl,
-              updated_at: new Date().toISOString()
-            }))
-          )
+        const { error: projError } = await upsertProjects(user, userData.projects)
         if (projError) throw projError
       }
 
@@ -326,19 +367,7 @@ export default function OnboardingPage() {
 
       // Save volunteer experience
       if (userData.volunteer.length > 0) {
-        const { error: volError } = await supabase
-          .from('volunteer_experience')
-          .upsert(
-            userData.volunteer.map(vol => ({
-              user_id: user.id,
-              organization_name: vol.organization,
-              role: vol.role,
-              start_date: vol.startDate,
-              end_date: vol.endDate,
-              description: vol.description,
-              updated_at: new Date().toISOString()
-            }))
-          )
+        const { error: volError } = await upsertVolunteer(user, userData.volunteer)
         if (volError) throw volError
       }
 
@@ -346,20 +375,7 @@ export default function OnboardingPage() {
 
       // Save certifications
       if (userData.certifications.length > 0) {
-        const { error: certError } = await supabase
-          .from('certifications')
-          .upsert(
-            userData.certifications.map(cert => ({
-              user_id: user.id,
-              certification_name: cert.name,
-              issuing_organization: cert.issuer,
-              issue_date: cert.issueDate,
-              expiry_date: cert.expiryDate,
-              certification_id: cert.certificationId,
-              certification_url: cert.certificationUrl,
-              updated_at: new Date().toISOString()
-            }))
-          )
+        const { error: certError } = await upsertCertifications(user, userData.certifications)
         if (certError) throw certError
       }
 
@@ -367,7 +383,7 @@ export default function OnboardingPage() {
       toast.success("Profile created successfully!")
 
       // Redirect to dashboard
-      router.push("/dashboard")
+      router.push("/")
     } catch (error) {
       console.error('Error saving profile:', error)
       toast.error("Failed to create profile. Please try again.")
@@ -549,7 +565,7 @@ export default function OnboardingPage() {
   // Helper function to format dates
   const formatDate = (dateStr: string) => {
     if (!dateStr || dateStr === 'Present') return null;
-    
+
     // Handle month year format (e.g., "January 2024")
     if (dateStr.includes(' ')) {
       const date = new Date(dateStr);
@@ -558,7 +574,7 @@ export default function OnboardingPage() {
       }
       return null;
     }
-    
+
     // Handle ISO date format
     return dateStr;
   };
@@ -817,71 +833,73 @@ export default function OnboardingPage() {
                     <Plus className="h-4 w-4 mr-2" /> Add Education
                   </Button>
                 </div>
-                {userData.education.map((edu, index) => (
-                  <div key={index} className="space-y-2 p-4 border rounded-lg relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 top-2"
-                      onClick={() => removeArrayField("education", index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      placeholder="Institution Name"
-                      value={edu.school}
-                      onChange={(e) =>
-                        updateArrayField("education", index, { ...edu, school: e.target.value })
-                      }
-                    />
-                    <Input
-                      placeholder="Degree"
-                      value={edu.degree}
-                      onChange={(e) =>
-                        updateArrayField("education", index, { ...edu, degree: e.target.value })
-                      }
-                    />
-                    <Input
-                      placeholder="Field of Study"
-                      value={edu.field}
-                      onChange={(e) =>
-                        updateArrayField("education", index, { ...edu, field: e.target.value })
-                      }
-                    />
-                    <div className="grid grid-cols-2 gap-2">
+                {userData.education
+                  .filter(edu => edu.school || edu.degree || edu.field || edu.startDate || edu.endDate || edu.grade || edu.description)
+                  .map((edu, index) => (
+                    <div key={index} className="space-y-2 p-4 border rounded-lg relative">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-2"
+                        onClick={() => removeArrayField("education", index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                       <Input
-                        type="date"
-                        placeholder="Start Date"
-                        value={edu.startDate}
+                        placeholder="Institution Name"
+                        value={edu.school}
                         onChange={(e) =>
-                          updateArrayField("education", index, { ...edu, startDate: e.target.value })
+                          updateArrayField("education", index, { ...edu, school: e.target.value })
                         }
                       />
                       <Input
-                        type="date"
-                        placeholder="End Date"
-                        value={edu.endDate}
+                        placeholder="Degree"
+                        value={edu.degree}
                         onChange={(e) =>
-                          updateArrayField("education", index, { ...edu, endDate: e.target.value })
+                          updateArrayField("education", index, { ...edu, degree: e.target.value })
+                        }
+                      />
+                      <Input
+                        placeholder="Field of Study"
+                        value={edu.field}
+                        onChange={(e) =>
+                          updateArrayField("education", index, { ...edu, field: e.target.value })
+                        }
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          type="date"
+                          placeholder="Start Date"
+                          value={edu.startDate}
+                          onChange={(e) =>
+                            updateArrayField("education", index, { ...edu, startDate: e.target.value })
+                          }
+                        />
+                        <Input
+                          type="date"
+                          placeholder="End Date"
+                          value={edu.endDate}
+                          onChange={(e) =>
+                            updateArrayField("education", index, { ...edu, endDate: e.target.value })
+                          }
+                        />
+                      </div>
+                      <Input
+                        placeholder="Grade/GPA"
+                        value={edu.grade}
+                        onChange={(e) =>
+                          updateArrayField("education", index, { ...edu, grade: e.target.value })
+                        }
+                      />
+                      <Textarea
+                        placeholder="Description (e.g., thesis details, achievements)"
+                        value={edu.description}
+                        onChange={(e) =>
+                          updateArrayField("education", index, { ...edu, description: e.target.value })
                         }
                       />
                     </div>
-                    <Input
-                      placeholder="Grade/GPA"
-                      value={edu.grade}
-                      onChange={(e) =>
-                        updateArrayField("education", index, { ...edu, grade: e.target.value })
-                      }
-                    />
-                    <Textarea
-                      placeholder="Description (e.g., thesis details, achievements)"
-                      value={edu.description}
-                      onChange={(e) =>
-                        updateArrayField("education", index, { ...edu, description: e.target.value })
-                      }
-                    />
-                  </div>
-                ))}
+                  ))}
               </div>
 
               {/* Volunteer Experience */}
@@ -904,60 +922,62 @@ export default function OnboardingPage() {
                     <Plus className="h-4 w-4 mr-2" /> Add Volunteer Experience
                   </Button>
                 </div>
-                {userData.volunteer.map((vol, index) => (
-                  <div key={index} className="space-y-2 p-4 border rounded-lg relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 top-2"
-                      onClick={() => removeArrayField("volunteer", index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      placeholder="Organization"
-                      value={vol.organization}
-                      onChange={(e) =>
-                        updateArrayField("volunteer", index, {
-                          ...vol,
-                          organization: e.target.value,
-                        })
-                      }
-                    />
-                    <Input
-                      placeholder="Role"
-                      value={vol.role}
-                      onChange={(e) =>
-                        updateArrayField("volunteer", index, { ...vol, role: e.target.value })
-                      }
-                    />
-                    <div className="grid grid-cols-2 gap-2">
+                {userData.volunteer
+                  .filter(vol => vol.organization || vol.role || vol.startDate || vol.endDate || vol.description)
+                  .map((vol, index) => (
+                    <div key={index} className="space-y-2 p-4 border rounded-lg relative">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-2"
+                        onClick={() => removeArrayField("volunteer", index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                       <Input
-                        type="date"
-                        placeholder="Start Date"
-                        value={vol.startDate}
+                        placeholder="Organization"
+                        value={vol.organization}
                         onChange={(e) =>
-                          updateArrayField("volunteer", index, { ...vol, startDate: e.target.value })
+                          updateArrayField("volunteer", index, {
+                            ...vol,
+                            organization: e.target.value,
+                          })
                         }
                       />
                       <Input
-                        type="date"
-                        placeholder="End Date"
-                        value={vol.endDate}
+                        placeholder="Role"
+                        value={vol.role}
                         onChange={(e) =>
-                          updateArrayField("volunteer", index, { ...vol, endDate: e.target.value })
+                          updateArrayField("volunteer", index, { ...vol, role: e.target.value })
+                        }
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          type="date"
+                          placeholder="Start Date"
+                          value={vol.startDate}
+                          onChange={(e) =>
+                            updateArrayField("volunteer", index, { ...vol, startDate: e.target.value })
+                          }
+                        />
+                        <Input
+                          type="date"
+                          placeholder="End Date"
+                          value={vol.endDate}
+                          onChange={(e) =>
+                            updateArrayField("volunteer", index, { ...vol, endDate: e.target.value })
+                          }
+                        />
+                      </div>
+                      <Textarea
+                        placeholder="Description"
+                        value={vol.description}
+                        onChange={(e) =>
+                          updateArrayField("volunteer", index, { ...vol, description: e.target.value })
                         }
                       />
                     </div>
-                    <Textarea
-                      placeholder="Description"
-                      value={vol.description}
-                      onChange={(e) =>
-                        updateArrayField("volunteer", index, { ...vol, description: e.target.value })
-                      }
-                    />
-                  </div>
-                ))}
+                  ))}
               </div>
 
               {/* Certifications */}
@@ -979,65 +999,67 @@ export default function OnboardingPage() {
                     <Plus className="h-4 w-4 mr-2" /> Add Certification
                   </Button>
                 </div>
-                {userData.certifications.map((cert, index) => (
-                  <div key={index} className="space-y-2 p-4 border rounded-lg relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 top-2"
-                      onClick={() => removeArrayField("certifications", index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      placeholder="Certification Name"
-                      value={cert.name}
-                      onChange={(e) =>
-                        updateArrayField("certifications", index, { ...cert, name: e.target.value })
-                      }
-                    />
-                    <Input
-                      placeholder="Issuing Organization"
-                      value={cert.issuer}
-                      onChange={(e) =>
-                        updateArrayField("certifications", index, { ...cert, issuer: e.target.value })
-                      }
-                    />
-                    <div className="grid grid-cols-2 gap-2">
+                {userData.certifications
+                  .filter(cert => cert.name || cert.issuer || cert.issueDate || cert.expiryDate || cert.certificationId || cert.certificationUrl)
+                  .map((cert, index) => (
+                    <div key={index} className="space-y-2 p-4 border rounded-lg relative">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-2"
+                        onClick={() => removeArrayField("certifications", index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                       <Input
-                        type="date"
-                        placeholder="Issue Date"
-                        value={cert.issueDate}
+                        placeholder="Certification Name"
+                        value={cert.name}
                         onChange={(e) =>
-                          updateArrayField("certifications", index, { ...cert, issueDate: e.target.value })
+                          updateArrayField("certifications", index, { ...cert, name: e.target.value })
                         }
                       />
                       <Input
-                        type="date"
-                        placeholder="Expiry Date (if applicable)"
-                        value={cert.expiryDate}
+                        placeholder="Issuing Organization"
+                        value={cert.issuer}
                         onChange={(e) =>
-                          updateArrayField("certifications", index, { ...cert, expiryDate: e.target.value })
+                          updateArrayField("certifications", index, { ...cert, issuer: e.target.value })
+                        }
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          type="date"
+                          placeholder="Issue Date"
+                          value={cert.issueDate}
+                          onChange={(e) =>
+                            updateArrayField("certifications", index, { ...cert, issueDate: e.target.value })
+                          }
+                        />
+                        <Input
+                          type="date"
+                          placeholder="Expiry Date (if applicable)"
+                          value={cert.expiryDate}
+                          onChange={(e) =>
+                            updateArrayField("certifications", index, { ...cert, expiryDate: e.target.value })
+                          }
+                        />
+                      </div>
+                      <Input
+                        placeholder="Certification ID"
+                        value={cert.certificationId}
+                        onChange={(e) =>
+                          updateArrayField("certifications", index, { ...cert, certificationId: e.target.value })
+                        }
+                      />
+                      <Input
+                        placeholder="Certification URL"
+                        type="url"
+                        value={cert.certificationUrl}
+                        onChange={(e) =>
+                          updateArrayField("certifications", index, { ...cert, certificationUrl: e.target.value })
                         }
                       />
                     </div>
-                    <Input
-                      placeholder="Certification ID"
-                      value={cert.certificationId}
-                      onChange={(e) =>
-                        updateArrayField("certifications", index, { ...cert, certificationId: e.target.value })
-                      }
-                    />
-                    <Input
-                      placeholder="Certification URL"
-                      type="url"
-                      value={cert.certificationUrl}
-                      onChange={(e) =>
-                        updateArrayField("certifications", index, { ...cert, certificationUrl: e.target.value })
-                      }
-                    />
-                  </div>
-                ))}
+                  ))}
               </div>
 
               {/* Languages */}
@@ -1052,22 +1074,24 @@ export default function OnboardingPage() {
                     <Plus className="h-4 w-4 mr-2" /> Add Language
                   </Button>
                 </div>
-                {userData.languages.map((language, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      placeholder="Language"
-                      value={language}
-                      onChange={(e) => updateArrayField("languages", index, e.target.value)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeArrayField("languages", index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                {userData.languages
+                  .filter(language => language && language.trim() !== "")
+                  .map((language, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        placeholder="Language"
+                        value={language}
+                        onChange={(e) => updateArrayField("languages", index, e.target.value)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeArrayField("languages", index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
               </div>
             </TabsContent>
           </Tabs>

@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   try {
     const { resumeText } = await request.json();
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
     const prompt = `
       Parse this resume text and return a JSON object with the following structure:
