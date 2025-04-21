@@ -19,9 +19,12 @@ export interface Job {
   jobUrl: string
   jobDescription: string
   notes: string
+  attachedResumeId?: string // New: resume association
 }
 
-export interface JobFormData extends Omit<Job, 'id'> {}
+export interface JobFormData extends Omit<Job, 'id'> {
+  attachedResumeId?: string // New: resume association
+}
 
 export interface JobsState {
   wishlist: Job[]

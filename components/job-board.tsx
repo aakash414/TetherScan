@@ -19,6 +19,10 @@ const columns: Column[] = [
 import { useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
+import { ResumePickerDialog } from "@/components/resume-picker-dialog";
+import { getResumes } from "@/lib/supabase/services/resume";
+import { createClient } from "@/lib/supabase/client";
+
 export function JobBoard() {
   const [jobs, setJobs] = useState<JobsState>({
     wishlist: [],
@@ -29,6 +33,17 @@ export function JobBoard() {
   })
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [resumePickerOpen, setResumePickerOpen] = useState(false);
+  const [resumePickerJob, setResumePickerJob] = useState<Job | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserId(user.id);
+    })();
+  }, []);
 
   useEffect(() => {
     // Fetch jobs from Supabase and organize by status
@@ -80,6 +95,25 @@ export function JobBoard() {
     }
   }
 
+  async function handleAttachResume(job: Job, resume: any) {
+    // Update job with attachedResumeId
+    try {
+      await jobsService.updateJob(job.id, { attachedResumeId: resume.id });
+      setJobs(prev => ({
+        ...prev,
+        wishlist: prev.wishlist.map(j => j.id === job.id ? { ...j, attachedResumeId: resume.id } : j),
+        // Other columns unchanged
+        applied: prev.applied,
+        interviewing: prev.interviewing,
+        offered: prev.offered,
+        rejected: prev.rejected,
+      }));
+    } catch (err) {
+      // Optionally: show toast
+      console.error("Failed to attach resume", err);
+    }
+  }
+
   return (
     <>
       <Card className="col-span-2">
@@ -105,6 +139,8 @@ export function JobBoard() {
                             {(provided) => {
                               let dragTimeout: NodeJS.Timeout | null = null;
                               let wasDragged = false;
+                              // Only show resume picker for wishlist jobs
+                              const isWishlist = column.id === "wishlist";
                               return (
                                 <div
                                   ref={provided.innerRef}
@@ -134,6 +170,20 @@ export function JobBoard() {
                                     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-move"><circle cx="8" cy="8" r="7.5" stroke="#006D77" /><path d="M8 4v8m0-8-2 2m2-2 2 2m-2 6 2-2m-2 2-2-2m-4-2h8m-8 0 2-2m-2 2 2 2m6-2-2-2m2 2-2 2" /></svg>
                                   </span>
                                   <JobCard job={job} />
+                                  {isWishlist && (
+                                    <div className="mt-2 flex justify-end">
+                                      <button
+                                        className="text-xs text-blue-700 underline"
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          setResumePickerJob(job);
+                                          setResumePickerOpen(true);
+                                        }}
+                                      >
+                                        {job.attachedResumeId ? "Change Resume" : "Attach Resume"}
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )
                             }}
@@ -149,6 +199,20 @@ export function JobBoard() {
           </DragDropContext>
         </CardContent>
       </Card>
+
+      {/* Resume Picker Dialog for wishlist jobs */}
+      {resumePickerJob && userId && (
+        <ResumePickerDialog
+          open={resumePickerOpen}
+          onOpenChange={setResumePickerOpen}
+          userId={userId}
+          onSelectResume={resume => {
+            handleAttachResume(resumePickerJob, resume);
+            setResumePickerOpen(false);
+            setResumePickerJob(null);
+          }}
+        />
+      )}
 
       {/* Expanded Job Details Modal */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>

@@ -39,5 +39,16 @@ export const jobsService = {
     if (error) throw error
     return data
   },
+  async updateJob(jobId: string, updates: Partial<Job>) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('jobs')
+      .update(updates)
+      .eq('id', jobId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
   // ... other job-related operations
 } 
