@@ -51,7 +51,7 @@ export default function ProfilePage() {
             }
             
             // Refresh the materialized view
-            await supabase.rpc('refresh_user_master_profile')
+            await refreshUserMasterProfile()
             
             // Fetch the user again from the materialized view
             const { data: refreshedUser } = await getUserMasterProfile(authUser.id)
