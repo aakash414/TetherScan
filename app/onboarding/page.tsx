@@ -21,8 +21,9 @@ import {
   upsertProjects,
   upsertVolunteer,
   upsertCertifications,
-
 } from '@/lib/supabase/services/profile'
+import { getUserMasterProfile } from '@/lib/supabase/services/user-profile'
+import { mapMasterProfileToUserData } from '@/lib/utils/profile-mapper'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import * as pdfjsLib from 'pdfjs-dist';
@@ -545,14 +546,30 @@ export default function OnboardingPage() {
           return
         }
 
-        if (user && user.user_metadata) {
-          setUserData(prevData => ({
-            ...prevData,
-            name: user.user_metadata.full_name || prevData.name,
-            email: user.email || prevData.email,
-            // If avatar_url exists in metadata, use it for profile image
-            profile_image: user.user_metadata.avatar_url || prevData.profile_image
-          }))
+        if (user) {
+          // Try to fetch user data from the materialized view first
+          const { data: masterProfile, error: profileError } = await getUserMasterProfile(user.id)
+          
+          if (!profileError && masterProfile) {
+            // Map the materialized view data to the format expected by the UI
+            const mappedUserData = mapMasterProfileToUserData(masterProfile)
+            // Ensure all required properties are present
+            setUserData(prevData => ({
+              ...prevData,
+              ...mappedUserData
+            }))
+          } else {
+            // Fallback to basic user data if the profile doesn't exist yet
+            if (user.user_metadata) {
+              setUserData(prevData => ({
+                ...prevData,
+                name: user.user_metadata.full_name || prevData.name,
+                email: user.email || prevData.email,
+                // If avatar_url exists in metadata, use it for profile image
+                profile_image: user.user_metadata.avatar_url || prevData.profile_image
+              }))
+            }
+          }
         }
       } catch (error) {
         console.error('Error in fetchUserData:', error)

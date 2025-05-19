@@ -7,6 +7,7 @@ import { JobCard } from "@/components/job-card"
 import { AddJobDialog } from "@/components/add-job-dialog"
 import { Job, JobStatus, JobsState, Column } from "@/lib/types"
 import { jobsService } from "@/lib/supabase/services/jobs"
+import { batchCalculateJobMatches } from "@/lib/supabase/services/job-matching"
 
 const columns: Column[] = [
   { id: "wishlist", title: "Wishlist", color: "bg-blue-100 dark:bg-blue-900" },
@@ -31,6 +32,11 @@ export function JobBoard() {
     offered: [],
     rejected: []
   })
+  const [jobMatches, setJobMatches] = useState<Map<string, {
+    score: number;
+    matchedSkills: string[];
+    missingSkills: string[];
+  }>>(new Map())
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [resumePickerOpen, setResumePickerOpen] = useState(false);
@@ -59,10 +65,21 @@ export function JobBoard() {
         grouped[job.status].push(job)
       })
       setJobs(grouped)
+      
+      // If user is logged in, calculate job matches using the materialized view
+      if (userId) {
+        batchCalculateJobMatches(userId, allJobs)
+          .then(matches => {
+            setJobMatches(matches)
+          })
+          .catch(err => {
+            console.error('Failed to calculate job matches:', err)
+          })
+      }
     }).catch(err => {
       console.error('Failed to fetch jobs from Supabase:', err)
     })
-  }, [])
+  }, [userId])
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return
@@ -169,7 +186,7 @@ export function JobBoard() {
                                   >
                                     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-move"><circle cx="8" cy="8" r="7.5" stroke="#006D77" /><path d="M8 4v8m0-8-2 2m2-2 2 2m-2 6 2-2m-2 2-2-2m-4-2h8m-8 0 2-2m-2 2 2 2m6-2-2-2m2 2-2 2" /></svg>
                                   </span>
-                                  <JobCard job={job} />
+                                  <JobCard job={job} showMatchScore={!!userId} userId={userId || ''} />
                                   {isWishlist && (
                                     <div className="mt-2 flex justify-end">
                                       <button
@@ -227,7 +244,7 @@ export function JobBoard() {
               </DialogHeader>
               <div className="space-y-2 mt-4">
                 <div><b>Role:</b> {selectedJob.role}</div>
-                <div><b>Salary:</b> {selectedJob.expectedSalaryMin && `$${selectedJob.expectedSalaryMin}`}{selectedJob.expectedSalaryMin && selectedJob.expectedSalaryMax && " - "}{selectedJob.expectedSalaryMax && `$${selectedJob.expectedSalaryMax}`} {selectedJob.salaryFrequency}</div>
+                <div><b>Salary:</b> {selectedJob.expectedSalaryMin && `₹${selectedJob.expectedSalaryMin}`}{selectedJob.expectedSalaryMin && selectedJob.expectedSalaryMax && " - "}{selectedJob.expectedSalaryMax && `₹${selectedJob.expectedSalaryMax}`} {selectedJob.salaryFrequency}</div>
                 <div><b>Job URL:</b> <a href={selectedJob.jobUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">{selectedJob.jobUrl}</a></div>
                 <div><b>Description:</b><br />{selectedJob.jobDescription}</div>
                 <div><b>Notes:</b><br />{selectedJob.notes}</div>
