@@ -19,37 +19,8 @@ export async function calculateJobMatch(userId: string, job: Job): Promise<{
     return { score: 0, matchedSkills: [], missingSkills: [] };
   }
   
-  // Extract job skills from job description or requirements
-  // This is a simple implementation - in a real app, you might use NLP or a more sophisticated approach
-  const jobDescription = job.jobDescription?.toLowerCase() || '';
-  const jobSkillsSet = new Set<string>();
-  
-  // Extract skills from the job description
-  // This is a simplified approach - in production, you'd use a more robust method
-  if (userProfile.skills && userProfile.skills.length > 0) {
-    userProfile.skills.forEach((skill: { skill_name: string; proficiency: string }) => {
-      // Check if the skill name appears in the job description
-      if (jobDescription.includes(skill.skill_name.toLowerCase())) {
-        jobSkillsSet.add(skill.skill_name.toLowerCase());
-      }
-    });
-  }
-  
-  // Add common tech skills that might be in the job description
-  const commonTechSkills = [
-    'javascript', 'typescript', 'react', 'node', 'python', 'java', 'c#', 'c++',
-    'sql', 'nosql', 'mongodb', 'postgresql', 'mysql', 'aws', 'azure', 'gcp',
-    'docker', 'kubernetes', 'ci/cd', 'git', 'agile', 'scrum', 'rest', 'graphql'
-  ];
-  
-  commonTechSkills.forEach(skill => {
-    if (jobDescription.includes(skill)) {
-      jobSkillsSet.add(skill);
-    }
-  });
-  
-  // Convert to array
-  const jobSkills = Array.from(jobSkillsSet);
+  // Extract job skills using the helper function
+  const jobSkills = extractJobSkills(job.jobDescription, userProfile);
   
   // Get user skills from the materialized view
   const userSkills = userProfile.skills?.map((s: { skill_name: string }) => s.skill_name.toLowerCase()) || [];
