@@ -1,9 +1,10 @@
 import { createClient } from '../client';
 import { UserData } from '@/types/user';
+import { refreshUserMasterProfile } from './user-profile';
 
 export async function upsertUserProfile(user: any, userData: UserData) {
   const supabase = createClient();
-  return supabase.from('users').upsert({
+  const result = await supabase.from('users').upsert({
     id: user.id,
     name: userData.name || user.user_metadata?.full_name,
     email: userData.email || user.email,
@@ -14,11 +15,18 @@ export async function upsertUserProfile(user: any, userData: UserData) {
     profile_image: userData.profile_image,
     updated_at: new Date().toISOString()
   });
+  
+  // Refresh the materialized view after updating user data
+  if (!result.error) {
+    await refreshUserMasterProfile();
+  }
+  
+  return result;
 }
 
 export async function upsertExperiences(user: any, experiences: UserData['experiences']) {
   const supabase = createClient();
-  return supabase.from('work_experience').upsert(
+  const result = await supabase.from('work_experience').upsert(
     experiences.map(exp => ({
       user_id: user.id,
       company_name: exp.company,
@@ -29,11 +37,18 @@ export async function upsertExperiences(user: any, experiences: UserData['experi
       updated_at: new Date().toISOString()
     }))
   );
+  
+  // Refresh the materialized view after updating experiences
+  if (!result.error) {
+    await refreshUserMasterProfile();
+  }
+  
+  return result;
 }
 
 export async function upsertEducation(user: any, education: UserData['education']) {
   const supabase = createClient();
-  return supabase.from('education').upsert(
+  const result = await supabase.from('education').upsert(
     education.map(edu => ({
       user_id: user.id,
       school: edu.school,
@@ -46,11 +61,18 @@ export async function upsertEducation(user: any, education: UserData['education'
       updated_at: new Date().toISOString()
     }))
   );
+  
+  // Refresh the materialized view after updating education
+  if (!result.error) {
+    await refreshUserMasterProfile();
+  }
+  
+  return result;
 }
 
 export async function upsertSkills(user: any, skills: UserData['skills']) {
   const supabase = createClient();
-  return supabase.from('skills').upsert(
+  const result = await supabase.from('skills').upsert(
     skills.map(skill => ({
       user_id: user.id,
       skill_name: skill.name,
@@ -58,11 +80,18 @@ export async function upsertSkills(user: any, skills: UserData['skills']) {
       updated_at: new Date().toISOString()
     }))
   );
+  
+  // Refresh the materialized view after updating skills
+  if (!result.error) {
+    await refreshUserMasterProfile();
+  }
+  
+  return result;
 }
 
 export async function upsertProjects(user: any, projects: UserData['projects']) {
   const supabase = createClient();
-  return supabase.from('projects').upsert(
+  const result = await supabase.from('projects').upsert(
     projects.map(proj => ({
       user_id: user.id,
       title: proj.name,
@@ -72,11 +101,18 @@ export async function upsertProjects(user: any, projects: UserData['projects']) 
       updated_at: new Date().toISOString()
     }))
   );
+  
+  // Refresh the materialized view after updating projects
+  if (!result.error) {
+    await refreshUserMasterProfile();
+  }
+  
+  return result;
 }
 
 export async function upsertVolunteer(user: any, volunteer: UserData['volunteer']) {
   const supabase = createClient();
-  return supabase.from('volunteer').upsert(
+  const result = await supabase.from('volunteer').upsert(
     volunteer.map(vol => ({
       user_id: user.id,
       organization: vol.organization,
@@ -87,11 +123,18 @@ export async function upsertVolunteer(user: any, volunteer: UserData['volunteer'
       updated_at: new Date().toISOString()
     }))
   );
+  
+  // Refresh the materialized view after updating volunteer experience
+  if (!result.error) {
+    await refreshUserMasterProfile();
+  }
+  
+  return result;
 }
 
 export async function upsertCertifications(user: any, certifications: UserData['certifications']) {
   const supabase = createClient();
-  return supabase.from('certifications').upsert(
+  const result = await supabase.from('certifications').upsert(
     certifications.map(cert => ({
       user_id: user.id,
       name: cert.name,
@@ -103,4 +146,11 @@ export async function upsertCertifications(user: any, certifications: UserData['
       updated_at: new Date().toISOString()
     }))
   );
+  
+  // Refresh the materialized view after updating certifications
+  if (!result.error) {
+    await refreshUserMasterProfile();
+  }
+  
+  return result;
 }
