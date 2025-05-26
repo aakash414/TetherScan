@@ -5,10 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { createClient } from '@/lib/supabase/client'
-import { getUserMasterProfile } from '@/lib/supabase/services/user-profile'
-import { UserMasterProfile } from '@/types/user-master-profile'
 export default function ProfilePage() {
-  const [user, setUser] = useState<UserMasterProfile | null>(null)
+  const [user, setUser] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const router = useRouter()
@@ -29,7 +27,7 @@ export default function ProfilePage() {
 
         if (dbError) {
           console.error('Error fetching user profile:', dbError)
-          
+
           // If user doesn't exist in our table, create a basic profile
           if (dbError.code === 'PGRST116') { // Record not found error
             const newUser = {
@@ -49,10 +47,10 @@ export default function ProfilePage() {
               console.error('Error creating user:', insertError)
               return
             }
-            
+
             // Refresh the materialized view
-            await refreshUserMasterProfile()
-            
+            await supabase.rpc('refresh_user_master_profile')
+
             // Fetch the user again from the materialized view
             const { data: refreshedUser } = await getUserMasterProfile(authUser.id)
             setUser(refreshedUser)
@@ -112,7 +110,7 @@ export default function ProfilePage() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mt-4">Skills</h3>
                 <div className="mt-1 flex flex-wrap gap-2">
-                  {user.skills.map((skill, index) => (
+                  {user.skills.map((skill: any, index: number) => (
                     <span key={index} className="px-2 py-1 bg-gray-100 rounded-md text-xs">
                       {skill.skill_name} ({skill.proficiency})
                     </span>

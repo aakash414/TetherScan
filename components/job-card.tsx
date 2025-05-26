@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Building2, MapPin } from 'lucide-react'
 import { JobMatchIndicator } from "@/components/job-match-indicator"
+import { JobDetailsDialog } from "@/components/job-details-dialog"
 
 interface JobCardProps {
   job: {
@@ -37,7 +38,6 @@ export function JobCard({ job, showMatchScore = false, userId }: JobCardProps) {
           </div>
           {(job.expectedSalaryMin || job.expectedSalaryMax) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {/* <DollarSign className="h-4 w-4" /> */}
               {job.expectedSalaryMin && `₹${job.expectedSalaryMin}`}
               {job.expectedSalaryMin && job.expectedSalaryMax && " - "}
               {job.expectedSalaryMax && `₹${job.expectedSalaryMax}`}
@@ -45,15 +45,16 @@ export function JobCard({ job, showMatchScore = false, userId }: JobCardProps) {
               {job.salaryFrequency}
             </div>
           )}
-          {/* Show job match indicator if requested and userId is available */}
+          {/* Job match indicator temporarily disabled
           {showMatchScore && userId && (
             <div className="mt-2">
               <JobMatchIndicator job={job} userId={userId} />
             </div>
           )}
+          */}
+          <JobDetailsDialog job={job} trigger={<button className="mt-2 px-4 py-2 rounded bg-[#006D77] text-white hover:bg-[#005a66] transition-colors">View Details</button>} />
         </div>
       </CardContent>
     </Card>
   )
 }
-

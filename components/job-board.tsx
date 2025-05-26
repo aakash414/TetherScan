@@ -4,6 +4,8 @@ import { useState } from "react"
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { JobCard } from "@/components/job-card"
+import { JobDetailsDialog } from "@/components/job-details-dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { AddJobDialog } from "@/components/add-job-dialog"
 import { Job, JobStatus, JobsState, Column } from "@/lib/types"
 import { jobsService } from "@/lib/supabase/services/jobs"
@@ -18,7 +20,6 @@ const columns: Column[] = [
 ]
 
 import { useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 import { ResumePickerDialog } from "@/components/resume-picker-dialog";
 import { getResumes } from "@/lib/supabase/services/resume";
@@ -233,25 +234,9 @@ export function JobBoard() {
 
       {/* Expanded Job Details Modal */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-xl">
-          {selectedJob && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{selectedJob.role} @ {selectedJob.company}</DialogTitle>
-                <DialogDescription>
-                  Status: <b>{selectedJob.status}</b> | {selectedJob.remote ? "Remote" : selectedJob.location}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-2 mt-4">
-                <div><b>Role:</b> {selectedJob.role}</div>
-                <div><b>Salary:</b> {selectedJob.expectedSalaryMin && `₹${selectedJob.expectedSalaryMin}`}{selectedJob.expectedSalaryMin && selectedJob.expectedSalaryMax && " - "}{selectedJob.expectedSalaryMax && `₹${selectedJob.expectedSalaryMax}`} {selectedJob.salaryFrequency}</div>
-                <div><b>Job URL:</b> <a href={selectedJob.jobUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">{selectedJob.jobUrl}</a></div>
-                <div><b>Description:</b><br />{selectedJob.jobDescription}</div>
-                <div><b>Notes:</b><br />{selectedJob.notes}</div>
-              </div>
-            </>
-          )}
-        </DialogContent>
+        {selectedJob && (
+          <JobDetailsDialog job={selectedJob} trigger={<></>} />
+        )}
       </Dialog>
     </>
   )

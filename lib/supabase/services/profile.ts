@@ -1,6 +1,13 @@
 import { createClient } from '../client';
 import { UserData } from '@/types/user';
-import { refreshUserMasterProfile } from './user-profile';
+
+// Fetches the full user profile for resume display using the RPC
+export async function getUserProfileForResume(userId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('get_user_profile_for_resume', { target_user_id: userId });
+  if (error) throw error;
+  return data;
+}
 
 export async function upsertUserProfile(user: any, userData: UserData) {
   const supabase = createClient();
@@ -16,10 +23,7 @@ export async function upsertUserProfile(user: any, userData: UserData) {
     updated_at: new Date().toISOString()
   });
   
-  // Refresh the materialized view after updating user data
-  if (!result.error) {
-    await refreshUserMasterProfile();
-  }
+
   
   return result;
 }
@@ -38,10 +42,7 @@ export async function upsertExperiences(user: any, experiences: UserData['experi
     }))
   );
   
-  // Refresh the materialized view after updating experiences
-  if (!result.error) {
-    await refreshUserMasterProfile();
-  }
+
   
   return result;
 }
@@ -62,10 +63,7 @@ export async function upsertEducation(user: any, education: UserData['education'
     }))
   );
   
-  // Refresh the materialized view after updating education
-  if (!result.error) {
-    await refreshUserMasterProfile();
-  }
+
   
   return result;
 }
@@ -81,10 +79,7 @@ export async function upsertSkills(user: any, skills: UserData['skills']) {
     }))
   );
   
-  // Refresh the materialized view after updating skills
-  if (!result.error) {
-    await refreshUserMasterProfile();
-  }
+
   
   return result;
 }
@@ -102,10 +97,7 @@ export async function upsertProjects(user: any, projects: UserData['projects']) 
     }))
   );
   
-  // Refresh the materialized view after updating projects
-  if (!result.error) {
-    await refreshUserMasterProfile();
-  }
+
   
   return result;
 }
@@ -124,10 +116,7 @@ export async function upsertVolunteer(user: any, volunteer: UserData['volunteer'
     }))
   );
   
-  // Refresh the materialized view after updating volunteer experience
-  if (!result.error) {
-    await refreshUserMasterProfile();
-  }
+
   
   return result;
 }
@@ -147,10 +136,7 @@ export async function upsertCertifications(user: any, certifications: UserData['
     }))
   );
   
-  // Refresh the materialized view after updating certifications
-  if (!result.error) {
-    await refreshUserMasterProfile();
-  }
+
   
   return result;
 }

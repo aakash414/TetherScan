@@ -383,6 +383,23 @@ export default function OnboardingPage() {
       setGenerationProgress(100)
       toast.success("Profile created successfully!")
 
+      // Sync GitHub projects if a valid GitHub username is provided
+      if (userData.github && /^[a-zA-Z0-9-]{1,39}$/.test(userData.github)) {
+        try {
+          await fetch('/api/github-projects/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': user.id
+            },
+            body: JSON.stringify({ user_id: user.id })
+          })
+        } catch (syncErr: any) {
+          console.error('GitHub sync error:', syncErr)
+          toast.error('Could not sync GitHub projects. You can try again from your profile page.')
+        }
+      }
+
       // Redirect to dashboard
       router.push("/")
     } catch (error) {
