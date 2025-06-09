@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { syncGitHubProjects, GitHubRepo } from '@/lib/github-sync'
+import { fetchAndProcessGitHubProjects } from '../route'
 
 export async function POST(req: Request) {
   // Assume authentication/session is handled and user_id is available via header or session
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  const githubApiUrl = process.env.NEXT_PUBLIC_SITE_URL + '/api/github-projects'
   let userId = ''
 
   // For demo: get userId from body or header
@@ -22,9 +22,7 @@ export async function POST(req: Request) {
   // Fetch projects from existing API
   let githubProjects: GitHubRepo[] = []
   try {
-    const resp = await fetch(githubApiUrl)
-    if (!resp.ok) throw new Error('Failed to fetch from GitHub API proxy')
-    githubProjects = await resp.json()
+    githubProjects = await fetchAndProcessGitHubProjects()
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
