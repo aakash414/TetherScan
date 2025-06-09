@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/browser-client'
 
 type AuthContextType = {
   user: User | null
@@ -17,25 +17,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   
   useEffect(() => {
+    let didSettle = false;
+    let timeoutId: NodeJS.Timeout | number | undefined;
+
     async function getUser() {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      setLoading(false)
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) {
+          console.error('Supabase getUser error:', error);
+        }
+        console.log('Supabase getUser result:', user);
+        setUser(user);
+      } catch (err) {
+        console.error('Error in getUser:', err);
+      } finally {
+        setLoading(false);
+        didSettle = true;
+      }
     }
-    
-    getUser()
-    
+
+    getUser();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setUser(session?.user || null)
-        setLoading(false)
+        console.log('Supabase auth state change:', event, session);
+        setUser(session?.user || null);
+        setLoading(false);
+        didSettle = true;
       }
-    )
-    
+    );
+
+    // Timeout fallback: if nothing resolves in 5s, set loading to false
+    timeoutId = setTimeout(() => {
+      if (!didSettle) {
+        setLoading(false);
+        console.warn('AuthProvider: Timed out waiting for getUser or auth state change.');
+      }
+    }, 5000);
+
     return () => {
-      subscription.unsubscribe()
+      subscription.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
     }
-  }, [supabase])
+  }, [supabase]);
 
   return (
     <AuthContext.Provider value={{ user, loading }}>

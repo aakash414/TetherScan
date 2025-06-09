@@ -1,4 +1,4 @@
-import { createClient } from '../client'
+import { createClient } from '../browser-client'
 import type { Job, JobFormData } from '@/lib/types'
 
 export const jobsService = {

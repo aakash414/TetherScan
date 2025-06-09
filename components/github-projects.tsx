@@ -19,6 +19,52 @@ export function GitHubProjects() {
   const [projects, setProjects] = useState<GitHubProject[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+
+  // Get authenticated user from Supabase
+  const [user, setUser] = useState<import('@supabase/auth-helpers-nextjs').User | null>(null)
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
+      const supabase = createClientComponentClient()
+      const { data } = await supabase.auth.getUser()
+      setUser(data.user)
+    }
+    fetchUser()
+  }, [])
+
+  const handleSync = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    setError(null)
+    if (!user) {
+      setError('You must be logged in to sync projects.');
+      setSyncing(false);
+      return;
+    }
+    try {
+      const resp = await fetch('/api/github-projects/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: user.id }),
+      })
+      const result = await resp.json()
+      if (!resp.ok) {
+        throw new Error(result.error || 'Sync failed')
+      }
+      setSyncResult(`Synced! Created: ${result.created}, Updated: ${result.updated}${result.errors?.length ? ', Errors: ' + result.errors.length : ''}`)
+      // Optionally refresh projects after sync
+      await fetchProjects()
+    } catch (err: any) {
+      setError(err.message || 'Sync failed')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const fetchProjects = async () => {
     setLoading(true)
@@ -49,10 +95,15 @@ export function GitHubProjects() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-2xl font-bold text-[#006D77]">GitHub Projects</h3>
-        <Button onClick={fetchProjects} disabled={loading} variant="outline" size="sm">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={fetchProjects} disabled={loading || syncing} variant="outline" size="sm">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <Button onClick={handleSync} disabled={loading || syncing} variant="default" size="sm">
+            {syncing ? 'Syncing...' : 'Sync from GitHub'}
+          </Button>
+        </div>
       </div>
       {loading ? (
         <p>Loading GitHub projects...</p>
@@ -91,15 +142,15 @@ export function GitHubProjects() {
                 {project.homepage && (
                   <Button variant="outline" size="sm" className="text-[#006D77]" asChild>
                     <a href={project.homepage} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        Demo
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Demo
                     </a>
-                                          </Button>
+                  </Button>
                 )}
                 <Button variant="outline" size="sm" className="text-[#006D77]" >
                   <a href={project.html_url} target="_blank" rel="noopener noreferrer">
-                      <Github className="mr-2 h-4 w-4" />
-                      Source
+                    <Github className="mr-2 h-4 w-4" />
+                    Source
                   </a>
                 </Button>
               </CardFooter>

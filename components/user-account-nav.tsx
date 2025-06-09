@@ -16,7 +16,7 @@ import {
 import { SignInButton } from "@/components/signin-button";
 import { SignOutButton } from "@/components/signout-button";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/browser-client";
 import { User } from "@supabase/supabase-js";
 
 export function UserAccountNav({ user }: { user: User | null }) {

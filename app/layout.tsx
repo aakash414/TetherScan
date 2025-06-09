@@ -50,6 +50,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" async />
+      </head>
       <body className={`${acorn.variable} ${gt.variable} font-gt`}>
         <AuthProvider>
           <ThemeProvider

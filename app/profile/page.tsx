@@ -4,15 +4,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/browser-client'
+import { getUserProfileForResume } from "@/lib/supabase/services/profile";
+
 export default function ProfilePage() {
-  const [user, setUser] = useState<{
-    id: string
-    name: string
-    email: string
-    github_username: string | null
-    created_at: string
-  } | null>(null)
+  const [user, setUser] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const router = useRouter()
@@ -28,41 +24,40 @@ export default function ProfilePage() {
           return
         }
 
-        // Check if user exists in our users table
-        const supabaseClient = await supabase
-        const { data: userData, error: dbError } = await supabaseClient
-          .from('users')
-          .select('*')
-          .eq('email', authUser.email)
-          .single()
+        // Fetch user data using the unified profile RPC
+        const { data: userData, error: dbError } = await getUserProfileForResume(authUser.id)
 
         if (dbError) {
-          console.error('Error fetching user:', dbError)
+          console.error('Error fetching user profile:', dbError)
+
+          // If user doesn't exist in our table, create a basic profile
+          if (dbError.code === 'PGRST116') { // Record not found error
+            const newUser = {
+              id: authUser.id,
+              email: authUser.email,
+              name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Anonymous',
+            }
+
+            const supabaseClient = await supabase
+            const { data: insertedUser, error: insertError } = await supabaseClient
+              .from('users')
+              .insert([newUser])
+              .select()
+              .single()
+
+            if (insertError) {
+              console.error('Error creating user:', insertError)
+              return
+            }
+
+            // Fetch the user again from the unified profile RPC
+            const { data: refreshedUser } = await getUserProfileForResume(authUser.id)
+            setUser(refreshedUser)
+          }
           return
         }
 
-        // If user doesn't exist in our table, create them
-        if (!userData) {
-          const newUser = {
-            email: authUser.email,
-            name: authUser.user_metadata.full_name || authUser.email?.split('@')[0] || 'Anonymous',
-          }
-
-          const { data: insertedUser, error: insertError } = await supabaseClient
-            .from('users')
-            .insert([newUser])
-            .select()
-            .single()
-
-          if (insertError) {
-            console.error('Error creating user:', insertError)
-            return
-          }
-
-          setUser(insertedUser)
-        } else {
-          setUser(userData)
-        }
+        setUser(userData)
       } catch (error) {
         console.error('Error:', error)
       } finally {
@@ -108,6 +103,18 @@ export default function ProfilePage() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500">GitHub Username</h3>
                 <p className="mt-1">{user.github_username}</p>
+              </div>
+            )}
+            {user?.skills && user.skills.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mt-4">Skills</h3>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {user.skills.map((skill: any, index: number) => (
+                    <span key={index} className="px-2 py-1 bg-gray-100 rounded-md text-xs">
+                      {skill.skill_name} ({skill.proficiency})
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
