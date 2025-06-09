@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { syncGitHubProjects, GitHubRepo } from '@/lib/github-sync'
-import { fetchAndProcessGitHubProjects } from '../route'
+import { fetchAndProcessGitHubProjects } from '../github-service'
 
 export async function POST(req: Request) {
   // Assume authentication/session is handled and user_id is available via header or session
