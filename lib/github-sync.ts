@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 export interface GitHubRepo {
   id: number
@@ -65,8 +66,9 @@ export async function syncGitHubProjects({
   // Refresh the materialized view so the projects field in user_master_profile is up-to-date
   try {
     // Import and call the refreshUserMasterProfile service
-    const { refreshUserMasterProfile } = await import('./supabase/services/user-profile')
-    await refreshUserMasterProfile()
+    const { refreshUserMasterProfile } = await import('./supabase/services/user-profile');
+    const cookieStore = await cookies(); // Diagnostic: Awaiting if TS thinks it's a Promise
+    await refreshUserMasterProfile(cookieStore);
   } catch (refreshErr: any) {
     errors.push(`Failed to refresh user_master_profile: ${refreshErr.message}`)
   }

@@ -1,7 +1,8 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { calculateJobMatch } from '@/lib/supabase/services/job-matching';
 
 interface JobMatchIndicatorProps {
   job: {
@@ -26,16 +27,24 @@ export function JobMatchIndicator({ job, userId }: JobMatchIndicatorProps) {
   });
 
   useEffect(() => {
-    async function getMatchScore() {
+    let isMounted = true;
+    
+    const fetchMatchData = async () => {
+      if (!userId || !job?.jobDescription) return;
+      
+      setMatchData(prev => ({ ...prev, isLoading: true }));
+      
       try {
-        // Create a minimal job object with required properties for matching
+        // Create a complete job object with all required properties
         const jobForMatching = {
-          jobDescription: job.jobDescription || '',
-          status: 'wishlist' as 'wishlist' | 'applied' | 'interviewing' | 'offered' | 'rejected',  // Default value
-          company: job.company || '',
-          location: '',        // Default value
+          ...job,
+          jobDescription: job.jobDescription || '',  // Ensure jobDescription exists
+          title: job.title || '',  // Ensure title exists
+          company: job.company || '',  // Ensure company exists
+          location: job.location || '', // Ensure location exists
           remote: false,       // Default value
           role: job.role || '',
+          status: job.status || 'wishlist',  // Required by Job type
           expectedSalaryMin: '',// Default value
           expectedSalaryMax: '',// Default value
           salaryFrequency: 'yearly' as 'hourly' | 'monthly' | 'yearly', // Default value
@@ -44,19 +53,39 @@ export function JobMatchIndicator({ job, userId }: JobMatchIndicatorProps) {
           id: job.id           // Must be last to avoid being overwritten
         };
         
-        const result = await calculateJobMatch(userId, jobForMatching);
-        setMatchData({
-          ...result,
-          isLoading: false
+        // We'll pass the cookie handling to the API route
+        const response = await fetch('/api/job-match', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId,
+            job: jobForMatching
+          })
         });
+        
+        if (!response.ok) {
+          throw new Error('Failed to calculate job match');
+        }
+        
+        const result = await response.json();
+        if (isMounted) {
+          setMatchData({
+            ...result,
+            isLoading: false
+          });
+        }
       } catch (error) {
         console.error('Error calculating job match:', error);
-        setMatchData(prev => ({ ...prev, isLoading: false }));
+        if (isMounted) {
+          setMatchData(prev => ({ ...prev, isLoading: false }));
+        }
       }
     }
 
     if (userId && job) {
-      getMatchScore();
+      fetchMatchData();
     }
   }, [userId, job]);
 

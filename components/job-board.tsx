@@ -9,7 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { AddJobDialog } from "@/components/add-job-dialog"
 import { Job, JobStatus, JobsState, Column } from "@/lib/types"
 import { jobsService } from "@/lib/supabase/services/jobs"
-import { batchCalculateJobMatches } from "@/lib/supabase/services/job-matching"
+
 
 const columns: Column[] = [
   { id: "wishlist", title: "Wishlist", color: "bg-blue-100 dark:bg-blue-900" },
@@ -23,7 +23,7 @@ import { useEffect } from "react"
 
 import { ResumePickerDialog } from "@/components/resume-picker-dialog";
 import { getResumes } from "@/lib/supabase/services/resume";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/browser-client";
 
 export function JobBoard() {
   const [jobs, setJobs] = useState<JobsState>({
@@ -67,15 +67,37 @@ export function JobBoard() {
       })
       setJobs(grouped)
       
-      // If user is logged in, calculate job matches using the materialized view
-      if (userId) {
-        batchCalculateJobMatches(userId, allJobs)
-          .then(matches => {
-            setJobMatches(matches)
+      // If user is logged in, calculate job matches via API
+      if (userId && allJobs.length > 0) {
+        fetch('/api/job-matches', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ jobs: allJobs }),
+        })
+          .then(async res => { // Added async here to await res.json() in error case
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({})); // Try to parse error body
+              throw new Error(`API error: ${res.status} ${res.statusText}. ${errorData.details || ''}`);
+            }
+            return res.json();
+          })
+          .then(data => {
+            if (data.jobMatches && Array.isArray(data.jobMatches)) {
+              setJobMatches(new Map(data.jobMatches));
+            } else {
+              console.error('Invalid job matches data from API:', data);
+              setJobMatches(new Map()); // Set to empty map on error or invalid data
+            }
           })
           .catch(err => {
-            console.error('Failed to calculate job matches:', err)
-          })
+            console.error('Failed to calculate job matches via API:', err);
+            setJobMatches(new Map()); // Set to empty map on fetch error
+          });
+      } else if (userId && allJobs.length === 0) {
+        // If there are no jobs, no need to call the API, just ensure matches are empty
+        setJobMatches(new Map());
       }
     }).catch(err => {
       console.error('Failed to fetch jobs from Supabase:', err)

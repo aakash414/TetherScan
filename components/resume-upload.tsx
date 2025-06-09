@@ -7,11 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UserData } from '@/types/user'; // You'll need to create this type
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/browser-client';
 
 const supabase = createClient();
-const { data: user } = await supabase.auth.getUser();
-console.log(user, 'user');
 
 // Update worker configuration
 if (typeof window !== 'undefined') {

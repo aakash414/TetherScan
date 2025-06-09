@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/browser-client'
+import { getUserProfileForResume } from "@/lib/supabase/services/profile";
+
 export default function ProfilePage() {
   const [user, setUser] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
@@ -22,8 +24,8 @@ export default function ProfilePage() {
           return
         }
 
-        // Fetch user data from the materialized view
-        const { data: userData, error: dbError } = await getUserMasterProfile(authUser.id)
+        // Fetch user data using the unified profile RPC
+        const { data: userData, error: dbError } = await getUserProfileForResume(authUser.id)
 
         if (dbError) {
           console.error('Error fetching user profile:', dbError)
@@ -48,11 +50,8 @@ export default function ProfilePage() {
               return
             }
 
-            // Refresh the materialized view
-            await supabase.rpc('refresh_user_master_profile')
-
-            // Fetch the user again from the materialized view
-            const { data: refreshedUser } = await getUserMasterProfile(authUser.id)
+            // Fetch the user again from the unified profile RPC
+            const { data: refreshedUser } = await getUserProfileForResume(authUser.id)
             setUser(refreshedUser)
           }
           return

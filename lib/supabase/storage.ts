@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/browser-client"
 
 export async function uploadResume(file: File, userId: string) {
   const supabase = createClient()

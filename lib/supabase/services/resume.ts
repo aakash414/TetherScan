@@ -1,4 +1,4 @@
-import { createClient } from '../client';
+import { createClient } from '../browser-client';
 
 export async function getResumes(userId: string) {
   const supabase = createClient();
@@ -42,6 +42,21 @@ export async function updateResume(resumeId: string, title: string, extractedDat
       updated_at: new Date().toISOString(),
     })
     .eq('id', resumeId)
+    .select()
+    .single();
+}
+
+export async function saveGeneratedHtmlResume(userId: string, title: string, htmlContent: string) {
+  const supabase = createClient();
+  return supabase
+    .from('resumes')
+    .insert([
+      {
+        user_id: userId,
+        title,
+        extracted_data: htmlContent, // Store raw HTML string
+      },
+    ])
     .select()
     .single();
 }

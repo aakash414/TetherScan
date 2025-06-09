@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/browser-client";
 import { User, AuthError, Session } from "@supabase/supabase-js";
 import { jwtDecode } from "jwt-decode";
 import type { JwtPayload } from "jwt-decode";

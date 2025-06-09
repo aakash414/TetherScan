@@ -8,7 +8,7 @@ import { ResumeUploadMinimal } from '@/components/resume-upload-minimal'
 import { ResumeLatexPreview } from '@/components/resume-latex-preview'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { getResumes, addResume, deleteResume } from '@/lib/supabase/services/resume'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/browser-client'
 
 export default function ResumesPage() {
   const [resumes, setResumes] = useState<any[]>([])

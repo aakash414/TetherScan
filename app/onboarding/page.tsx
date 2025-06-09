@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Plus, X } from "lucide-react"
 import { toast } from 'react-toastify'
 import { AutomaticProfile } from "@/components/automatic-profile"
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/browser-client';
 import {
   upsertUserProfile,
   upsertExperiences,
@@ -21,9 +21,9 @@ import {
   upsertProjects,
   upsertVolunteer,
   upsertCertifications,
-} from '@/lib/supabase/services/profile'
-import { getUserMasterProfile } from '@/lib/supabase/services/user-profile'
-import { mapMasterProfileToUserData } from '@/lib/utils/profile-mapper'
+} from '@/lib/supabase/services/client/profile-service';
+import { getUserMasterProfileForClient } from '@/app/actions/user-profile-actions';
+import { mapMasterProfileToUserData } from '@/lib/utils/profile-mapper';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import * as pdfjsLib from 'pdfjs-dist';
@@ -328,60 +328,60 @@ export default function OnboardingPage() {
 
       setGenerationProgress(10)
 
-      // Save or update user data
-      const { error: userError } = await upsertUserProfile(user, userData)
-      if (userError) throw userError
+      try {
+        // Save or update user data
+        await upsertUserProfile(user, userData);
+        setGenerationProgress(30);
 
-      setGenerationProgress(30)
+        // Save work experiences
+        if (userData.experiences.length > 0) {
+          await upsertExperiences(user, userData.experiences);
+        }
 
-      // Save work experiences
-      if (userData.experiences.length > 0) {
-        const { error: expError } = await upsertExperiences(user, userData.experiences)
-        if (expError) throw expError
+        setGenerationProgress(50);
+
+        // Save education
+        if (userData.education.length > 0) {
+          await upsertEducation(user, userData.education);
+        }
+
+        setGenerationProgress(60);
+
+        // Save skills
+        if (userData.skills.length > 0) {
+          await upsertSkills(user, userData.skills);
+        }
+
+        setGenerationProgress(70);
+
+        // Save projects
+        if (userData.projects.length > 0) {
+          await upsertProjects(user, userData.projects);
+        }
+
+        setGenerationProgress(80);
+
+        // Save volunteer experience
+        if (userData.volunteer.length > 0) {
+          await upsertVolunteer(user, userData.volunteer);
+        }
+
+        setGenerationProgress(90);
+
+        // Save certifications
+        if (userData.certifications.length > 0) {
+          await upsertCertifications(user, userData.certifications);
+        }
+
+        setGenerationProgress(100);
+        toast.success("Profile created successfully!");
+        router.push("/profile");
+      } catch (error) {
+        console.error("Error saving profile:", error);
+        toast.error("Failed to save profile. Please try again.");
+      } finally {
+        setIsGenerating(false);
       }
-
-      setGenerationProgress(50)
-
-      // Save education
-      if (userData.education.length > 0) {
-        const { error: eduError } = await upsertEducation(user, userData.education)
-        if (eduError) throw eduError
-      }
-
-      setGenerationProgress(60)
-
-      // Save skills
-      if (userData.skills.length > 0) {
-        const { error: skillError } = await upsertSkills(user, userData.skills)
-        if (skillError) throw skillError
-      }
-
-      setGenerationProgress(70)
-
-      // Save projects
-      if (userData.projects.length > 0) {
-        const { error: projError } = await upsertProjects(user, userData.projects)
-        if (projError) throw projError
-      }
-
-      setGenerationProgress(80)
-
-      // Save volunteer experience
-      if (userData.volunteer.length > 0) {
-        const { error: volError } = await upsertVolunteer(user, userData.volunteer)
-        if (volError) throw volError
-      }
-
-      setGenerationProgress(90)
-
-      // Save certifications
-      if (userData.certifications.length > 0) {
-        const { error: certError } = await upsertCertifications(user, userData.certifications)
-        if (certError) throw certError
-      }
-
-      setGenerationProgress(100)
-      toast.success("Profile created successfully!")
 
       // Sync GitHub projects if a valid GitHub username is provided
       if (userData.github && /^[a-zA-Z0-9-]{1,39}$/.test(userData.github)) {
@@ -564,10 +564,15 @@ export default function OnboardingPage() {
         }
 
         if (user) {
-          // Try to fetch user data from the materialized view first
-          const { data: masterProfile, error: profileError } = await getUserMasterProfile(user.id)
+          // Try to fetch user data from the user profiles table
+          console.log('Fetching profile for user:', user.id)
+          const { data: masterProfile, error: profileError } = await getUserMasterProfileForClient(user.id);
           
-          if (!profileError && masterProfile) {
+          if (profileError) {
+            console.error('Error fetching user profile:', profileError)
+          }
+
+          if (masterProfile) {
             // Map the materialized view data to the format expected by the UI
             const mappedUserData = mapMasterProfileToUserData(masterProfile)
             // Ensure all required properties are present
