@@ -10,15 +10,19 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Plus } from 'lucide-react'
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react"; // Added useEffect
 import { Job, JobFormData, JobStatus, SalaryFrequency, jobStatusEnum, salaryFrequencyEnum } from "@/lib/types"
 
 interface AddJobDialogProps {
-    onAddJob: (job: Job) => void
+    jobToEdit?: Job; // Optional: If provided, dialog is in edit mode
+    onSaveJob: (jobData: JobFormData, existingJobId?: string) => Promise<void>; // Unified save handler
+    triggerButton?: React.ReactNode; // Optional custom trigger
 }
 
-export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
-    const { toast } = useToast()
+export function AddJobDialog({ jobToEdit, onSaveJob, triggerButton }: AddJobDialogProps) {
+    const { toast } = useToast();
+    const isEditMode = !!jobToEdit;
     const [open, setOpen] = useState(false)
     const [inputMethod, setInputMethod] = useState<"manual" | "url">("manual")
     const [formData, setFormData] = useState<JobFormData>({
@@ -33,22 +37,16 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
         jobUrl: "",
         jobDescription: "",
         notes: "",
-    })
+        attachedResumeId: undefined,
+    });
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target
-        setFormData(prev => ({ ...prev, [name]: value }))
-    }
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        try {
-            const newJob: Job = {
-                ...formData,
-                id: crypto.randomUUID()
-            }
-            onAddJob(newJob)
-            setOpen(false)
+    useEffect(() => {
+        if (isEditMode && jobToEdit) {
+            // Pre-fill form data if in edit mode
+            const { id, ...editableJobData } = jobToEdit; // Exclude 'id' as it's not in JobFormData
+            setFormData(editableJobData as JobFormData); 
+        } else {
+            // Reset form for add mode or if jobToEdit becomes undefined
             setFormData({
                 company: "",
                 location: "",
@@ -61,13 +59,28 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
                 jobUrl: "",
                 jobDescription: "",
                 notes: "",
-            })
-            toast.success("Job added successfully")
-        } catch (error) {
-            console.error('Error submitting form:', error)
-            toast.error("Failed to add job")
+                attachedResumeId: undefined,
+            });
         }
+    }, [jobToEdit, isEditMode, open]); // Re-run if jobToEdit, isEditMode or open status changes
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target
+        setFormData(prev => ({ ...prev, [name]: value }))
     }
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await onSaveJob(formData, isEditMode ? jobToEdit.id : undefined);
+            setOpen(false);
+            // Resetting form data is handled by useEffect when 'open' changes to false
+            toast.success(isEditMode ? "Job updated successfully" : "Job added successfully");
+        } catch (error) {
+            console.error('Error submitting form:', error);
+            toast.error(isEditMode ? "Failed to update job" : "Failed to add job");
+        }
+    };
 
     const handleUrlScrape = async () => {
         try {
@@ -82,15 +95,19 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button className="bg-[#006D77] hover:bg-[#006D77]/90">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Job
-                </Button>
-            </DialogTrigger>
+            {triggerButton ? (
+                <DialogTrigger asChild>{triggerButton}</DialogTrigger>
+            ) : (
+                <DialogTrigger asChild>
+                    <Button className="bg-[#006D77] hover:bg-[#006D77]/90">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Job
+                    </Button>
+                </DialogTrigger>
+            )}
             <DialogContent className="max-w-lg w-full max-h-[80vh] p-4">
                 <DialogHeader>
-                    <DialogTitle>Add New Job</DialogTitle>
+                    <DialogTitle>{isEditMode ? 'Edit Job' : 'Add New Job'}</DialogTitle>
                     <DialogDescription>
                         Add a new job to your board. You can either enter the details manually or provide a job listing URL.
                     </DialogDescription>
@@ -251,7 +268,7 @@ export function AddJobDialog({ onAddJob }: AddJobDialogProps) {
 
                     <DialogFooter>
                         <Button type="submit" className="bg-[#006D77] hover:bg-[#006D77]/90">
-                            Add Job
+                            {isEditMode ? 'Save Changes' : 'Add Job'}
                         </Button>
                     </DialogFooter>
                 </form>

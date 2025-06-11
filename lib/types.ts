@@ -18,12 +18,16 @@ export interface Job {
   salaryFrequency: SalaryFrequency
   jobUrl: string
   jobDescription: string
-  notes: string
-  attachedResumeId?: string // New: resume association
+  notes?: string | undefined;
+  user_id?: string;
+  attachedResumeId?: string | null;
+  generated_resume_id?: string | null;
+  generated_resume_title?: string | null;
+  created_at?: string;
 }
 
 export interface JobFormData extends Omit<Job, 'id'> {
-  attachedResumeId?: string // New: resume association
+  attachedResumeId?: string | null;
 }
 
 export interface JobsState {

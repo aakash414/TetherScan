@@ -406,7 +406,7 @@ export default function OnboardingPage() {
       console.error('Error saving profile:', error)
       toast.error("Failed to create profile. Please try again.")
     } finally {
-      setIsGenerating(false)
+    setIsGenerating(false)
     }
   }
 
@@ -631,14 +631,14 @@ export default function OnboardingPage() {
               <TabsTrigger value="automatic">Automatic Setup</TabsTrigger>
               <TabsTrigger value="manual">Manual Setup</TabsTrigger>
             </TabsList>
-
+            
             <TabsContent value="automatic">
               <AutomaticProfile
                 userData={userData}
-                onResumeData={handleResumeData}
-                uploadStatus={uploadStatus}
-                setUploadStatus={setUploadStatus}
-              />
+                    onResumeData={handleResumeData}
+                    uploadStatus={uploadStatus}
+                    setUploadStatus={setUploadStatus}
+                  />
             </TabsContent>
 
             <TabsContent value="manual" className="space-y-6">
@@ -646,17 +646,17 @@ export default function OnboardingPage() {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Basic Information</h3>
                 <div className="flex flex-col space-y-4 mt-4">
-                  <Input
+                <Input
                     placeholder="Name"
-                    value={userData.name}
-                    onChange={(e) => setUserData({ ...userData, name: e.target.value })}
+                  value={userData.name}
+                  onChange={(e) => setUserData({ ...userData, name: e.target.value })}
                     required
-                  />
-                  <Input
-                    placeholder="Email"
-                    type="email"
-                    value={userData.email}
-                    onChange={(e) => setUserData({ ...userData, email: e.target.value })}
+                />
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  value={userData.email}
+                  onChange={(e) => setUserData({ ...userData, email: e.target.value })}
                     required
                   />
                   <div className="flex space-x-4">
@@ -799,8 +799,8 @@ export default function OnboardingPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => addArrayField("projects", {
-                      name: "",
-                      description: "",
+                        name: "",
+                        description: "",
                       githubUrl: "",
                       liveUrl: ""
                     })}
@@ -860,9 +860,9 @@ export default function OnboardingPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => addArrayField("education", {
-                      school: "",
-                      degree: "",
-                      field: "",
+                        school: "",
+                        degree: "",
+                        field: "",
                       startDate: "",
                       endDate: "",
                       grade: "",
@@ -875,42 +875,42 @@ export default function OnboardingPage() {
                 {userData.education
                   .filter(edu => edu.school || edu.degree || edu.field || edu.startDate || edu.endDate || edu.grade || edu.description)
                   .map((edu, index) => (
-                    <div key={index} className="space-y-2 p-4 border rounded-lg relative">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-2 top-2"
-                        onClick={() => removeArrayField("education", index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <Input
+                  <div key={index} className="space-y-2 p-4 border rounded-lg relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 top-2"
+                      onClick={() => removeArrayField("education", index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <Input
                         placeholder="Institution Name"
-                        value={edu.school}
-                        onChange={(e) =>
-                          updateArrayField("education", index, { ...edu, school: e.target.value })
-                        }
-                      />
-                      <Input
-                        placeholder="Degree"
-                        value={edu.degree}
-                        onChange={(e) =>
-                          updateArrayField("education", index, { ...edu, degree: e.target.value })
-                        }
-                      />
-                      <Input
-                        placeholder="Field of Study"
-                        value={edu.field}
-                        onChange={(e) =>
-                          updateArrayField("education", index, { ...edu, field: e.target.value })
-                        }
-                      />
+                      value={edu.school}
+                      onChange={(e) =>
+                        updateArrayField("education", index, { ...edu, school: e.target.value })
+                      }
+                    />
+                    <Input
+                      placeholder="Degree"
+                      value={edu.degree}
+                      onChange={(e) =>
+                        updateArrayField("education", index, { ...edu, degree: e.target.value })
+                      }
+                    />
+                    <Input
+                      placeholder="Field of Study"
+                      value={edu.field}
+                      onChange={(e) =>
+                        updateArrayField("education", index, { ...edu, field: e.target.value })
+                      }
+                    />
                       <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          type="date"
+                    <Input
+                      type="date"
                           placeholder="Start Date"
                           value={edu.startDate}
-                          onChange={(e) =>
+                      onChange={(e) =>
                             updateArrayField("education", index, { ...edu, startDate: e.target.value })
                           }
                         />
@@ -935,10 +935,10 @@ export default function OnboardingPage() {
                         value={edu.description}
                         onChange={(e) =>
                           updateArrayField("education", index, { ...edu, description: e.target.value })
-                        }
-                      />
-                    </div>
-                  ))}
+                      }
+                    />
+                  </div>
+                ))}
               </div>
 
               {/* Volunteer Experience */}
@@ -964,38 +964,38 @@ export default function OnboardingPage() {
                 {userData.volunteer
                   .filter(vol => vol.organization || vol.role || vol.startDate || vol.endDate || vol.description)
                   .map((vol, index) => (
-                    <div key={index} className="space-y-2 p-4 border rounded-lg relative">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-2 top-2"
-                        onClick={() => removeArrayField("volunteer", index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        placeholder="Organization"
-                        value={vol.organization}
-                        onChange={(e) =>
-                          updateArrayField("volunteer", index, {
-                            ...vol,
-                            organization: e.target.value,
-                          })
-                        }
-                      />
-                      <Input
-                        placeholder="Role"
-                        value={vol.role}
-                        onChange={(e) =>
-                          updateArrayField("volunteer", index, { ...vol, role: e.target.value })
-                        }
-                      />
+                  <div key={index} className="space-y-2 p-4 border rounded-lg relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 top-2"
+                      onClick={() => removeArrayField("volunteer", index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      placeholder="Organization"
+                      value={vol.organization}
+                      onChange={(e) =>
+                        updateArrayField("volunteer", index, {
+                          ...vol,
+                          organization: e.target.value,
+                        })
+                      }
+                    />
+                    <Input
+                      placeholder="Role"
+                      value={vol.role}
+                      onChange={(e) =>
+                        updateArrayField("volunteer", index, { ...vol, role: e.target.value })
+                      }
+                    />
                       <div className="grid grid-cols-2 gap-2">
-                        <Input
+                    <Input
                           type="date"
                           placeholder="Start Date"
                           value={vol.startDate}
-                          onChange={(e) =>
+                      onChange={(e) =>
                             updateArrayField("volunteer", index, { ...vol, startDate: e.target.value })
                           }
                         />
@@ -1008,15 +1008,15 @@ export default function OnboardingPage() {
                           }
                         />
                       </div>
-                      <Textarea
-                        placeholder="Description"
-                        value={vol.description}
-                        onChange={(e) =>
-                          updateArrayField("volunteer", index, { ...vol, description: e.target.value })
-                        }
-                      />
-                    </div>
-                  ))}
+                    <Textarea
+                      placeholder="Description"
+                      value={vol.description}
+                      onChange={(e) =>
+                        updateArrayField("volunteer", index, { ...vol, description: e.target.value })
+                      }
+                    />
+                  </div>
+                ))}
               </div>
 
               {/* Certifications */}
@@ -1116,21 +1116,21 @@ export default function OnboardingPage() {
                 {userData.languages
                   .filter(language => language && language.trim() !== "")
                   .map((language, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        placeholder="Language"
-                        value={language}
-                        onChange={(e) => updateArrayField("languages", index, e.target.value)}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeArrayField("languages", index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      placeholder="Language"
+                      value={language}
+                      onChange={(e) => updateArrayField("languages", index, e.target.value)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeArrayField("languages", index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             </TabsContent>
           </Tabs>

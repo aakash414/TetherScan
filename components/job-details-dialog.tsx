@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import HTMLResumeViewer from './resume/HTMLResumeViewer';
 import { generateHTMLResume, generatePDFClientSide } from '@/lib/utils/html-resume-generator';
 import { Button } from '@/components/ui/button';
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogTrigger,
@@ -9,353 +11,320 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
-import { Building2, MapPin, Loader2, FileText, FileCheck, AlertCircle } from "lucide-react";
+import { Building2, MapPin, Loader2, FileText, FileCheck, AlertCircle, Upload } from "lucide-react";
+import { useDropzone } from 'react-dropzone';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/components/ui/use-toast";
 import { createClient } from "@/lib/supabase/browser-client";
-import { saveGeneratedHtmlResume } from "@/lib/supabase/services/resume";
-
-export interface JobDetails {
-  id: string;
-  company: string;
-  location: string;
-  remote: boolean;
-  role: string;
-  expectedSalaryMin?: string;
-  expectedSalaryMax?: string;
-  salaryFrequency?: string;
-  jobDescription?: string;
-  jobUrl?: string;
-  notes?: string;
-  status?: string;
-}
+import { getResumeById, deleteResume, saveGeneratedHtmlResume } from "@/lib/supabase/services/resume";
+import { jobsService } from "@/lib/supabase/services/jobs";
+import { Job as JobType, JobFormData } from "@/lib/types";
 
 interface JobDetailsDialogProps {
-  job: JobDetails;
-  trigger?: React.ReactNode;
+  job: JobType;
+  onJobUpdated?: (updatedJob: JobType) => void;
+  onCloseDialog?: () => void;
 }
 
-export function JobDetailsDialog({ job, trigger }: JobDetailsDialogProps) {
-  const [resumeModalOpen, setResumeModalOpen] = useState(false);
-  const [resumeData, setResumeData] = useState<any>(null);
-  const [resumeHtml, setResumeHtml] = useState<string | null>(null);
-  const [isGeneratingResume, setIsGeneratingResume] = useState(false);
-  const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-  const [isSavingResume, setIsSavingResume] = useState(false);
-  const [savedResumeId, setSavedResumeId] = useState<string | null>(null);
-  const { user } = useAuth();
+// Helper component for resume uploading
+const ResumeUploader = ({ onUpload, isSaving, onCancel }: { onUpload: (content: string, isGenerated: boolean) => Promise<void>, isSaving: boolean, onCancel: () => void }) => {
   const { toast } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
+
+  const onDrop = React.useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      setFile(acceptedFiles[0]);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'application/pdf': ['.pdf'] },
+    multiple: false,
+  });
+
+  const handleParseAndUpload = async () => {
+    if (!file) {
+      toast({ title: 'No file selected', description: 'Please select a PDF file to upload.', variant: 'destructive' });
+      return;
+    }
+    setIsParsing(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      // @ts-ignore
+      const pdfjsLib = await import('pdfjs-dist/build/pdf');
+      // @ts-ignore
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + ' ';
+      }
+      await onUpload(fullText.trim(), false);
+      setFile(null);
+    } catch (err: any) {
+      toast({ title: 'Error Parsing PDF', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 p-4 border rounded-lg bg-white">
+      <div {...getRootProps()} className={`border-2 border-dashed p-6 rounded-md flex items-center justify-center cursor-pointer text-center ${isDragActive ? 'bg-blue-50 border-blue-400' : 'bg-gray-50'}`}>
+        <input {...getInputProps()} />
+        <div className="flex flex-col items-center gap-2 text-gray-500">
+          <Upload className="w-8 h-8" />
+          {file ? (
+            <span className="font-semibold text-emerald-600">{file.name}</span>
+          ) : isDragActive ? (
+            <span>Drop the PDF here...</span>
+          ) : (
+            <span>Drag & drop or click to select a PDF</span>
+          )}
+        </div>
+      </div>
+      <div className="flex gap-4">
+        <Button onClick={handleParseAndUpload} disabled={isParsing || isSaving} className="flex-1">
+          {(isParsing || isSaving) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isParsing ? 'Parsing...' : isSaving ? 'Saving...' : 'Upload and Attach'}
+        </Button>
+        <Button variant="ghost" onClick={onCancel} disabled={isParsing || isSaving}>Cancel</Button>
+      </div>
+    </div>
+  );
+};
+
+export function JobDetailsDialog({ job, onJobUpdated, onCloseDialog }: JobDetailsDialogProps) {
+  const { user } = useAuth();
   const supabase = createClient();
+  const { toast } = useToast();
+  const [draft, setDraft] = useState<Partial<JobFormData>>({});
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [resumeAction, setResumeAction] = useState<'upload' | 'generate' | null>(null);
+  
+  const [isLoadingAttachedResume, setIsLoadingAttachedResume] = useState(false);
+  const [attachedResumeHtml, setAttachedResumeHtml] = useState<string | null>(null);
+  const [attachedResumeError, setAttachedResumeError] = useState<string | null>(null);
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [resumeHtml, setResumeHtml] = useState<string | null>(null);
+  const [resumeData, setResumeData] = useState<any>(null);
+
+  const [resumeModalOpen, setResumeModalOpen] = useState(false);
+
+  useEffect(() => {
+    setDraft({
+      role: job.role, // Corrected: JobFormData uses 'role'
+      company: job.company, // Corrected: JobFormData uses 'company'
+      location: job.location,
+      jobUrl: job.jobUrl,
+      jobDescription: job.jobDescription,
+      status: job.status,
+      notes: job.notes,
+      // Ensure all other relevant fields from JobType that are in JobFormData are mapped
+      remote: job.remote,
+      expectedSalaryMin: job.expectedSalaryMin,
+      expectedSalaryMax: job.expectedSalaryMax,
+      salaryFrequency: job.salaryFrequency,
+      attachedResumeId: job.attachedResumeId,
+      generated_resume_id: job.generated_resume_id,
+      generated_resume_title: job.generated_resume_title,
+    });
+    setResumeAction(null);
+    setAttachedResumeHtml(null);
+    setResumeHtml(null);
+  }, [job]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const updatedJob = await jobsService.updateJob(supabase, job.id, draft);
+      toast({ title: "Job Saved", description: "Your changes have been saved successfully." });
+      if (onJobUpdated) {
+        onJobUpdated(updatedJob);
+      }
+    } catch (error) {
+      console.error("Failed to save job:", error);
+      toast({ title: "Error", description: "Failed to save job details.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleViewAttachedResume = async () => {
+    if (!job.attachedResumeId) return;
+    setIsLoadingAttachedResume(true);
+    setAttachedResumeError(null);
+    try {
+      const { data: resume, error } = await getResumeById(job.attachedResumeId);
+      if (error) throw error;
+      if (resume && resume.extracted_data) {
+        setAttachedResumeHtml(resume.extracted_data as string);
+        setResumeModalOpen(true);
+      } else {
+        throw new Error("Attached resume content not found or is empty.");
+      }
+    } catch (error: any) {
+      setAttachedResumeError(error.message);
+      toast({ title: "Error", description: `Could not load resume: ${error.message}`, variant: "destructive" });
+    } finally {
+      setIsLoadingAttachedResume(false);
+    }
+  };
+
+  const handleResumeSave = async (resumeContent: string, isGenerated: boolean) => {
+    if (!user) { toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" }); return; }
+    setIsSaving(true);
+    try {
+      if (job.attachedResumeId) {
+        await deleteResume(job.attachedResumeId);
+      }
+      const resumeTitle = `Resume for ${job.role} at ${job.company}`;
+      const { data: savedResume, error } = await saveGeneratedHtmlResume(user.id, resumeTitle, resumeContent, job.id);
+      if (error) throw error;
+      if (!savedResume) throw new Error("Failed to save resume.");
+      
+      const updatedJob = await jobsService.updateJob(supabase, job.id, { attachedResumeId: savedResume.id });
+      
+      toast({ title: "Resume Attached", description: "The new resume has been successfully attached to the job." });
+      
+      if (onJobUpdated) {
+        onJobUpdated(updatedJob);
+      }
+      setResumeAction(null);
+    } catch (error: any) {
+      toast({ title: "Error Saving Resume", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleGenerateResume = async () => {
+    if (!user) { toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" }); return; }
+    setIsGenerating(true);
+    setGenerationError(null);
+    setResumeHtml(null);
+    setAttachedResumeHtml(null);
+    try {
+      const response = await fetch('/api/generate-resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: job.id }) });
+      if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || 'Failed to fetch resume data.'); }
+      const result = await response.json();
+      setResumeData(result.data);
+      const html = generateHTMLResume(result.data.resume, result.data.metadata?.profileData || {}, result.data.metadata?.jobRequirements || {});
+      setResumeHtml(html);
+      setResumeModalOpen(true);
+      toast({ title: "Resume generated!", description: `Tailored for ${job.role} at ${job.company}` });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate resume';
+      setGenerationError(errorMessage);
+      toast({ title: "Resume generation failed", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <>
-      <Dialog>
-        <DialogTrigger asChild>{trigger}</DialogTrigger>
-        <DialogContent className="max-w-xl w-full p-6 bg-white rounded-lg shadow-xl flex flex-col max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>
-              {job.role} @ {job.company}
-            </DialogTitle>
-            <DialogDescription>
-              {job.status && (
-                <>
-                  Status: <b>{job.status}</b> |
-                </>
-              )}
-              {job.remote ? "Remote" : job.location}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-grow overflow-y-auto py-4 pr-2"> {/* Scrollable wrapper with padding */}
-            <div className="space-y-2"> {/* Removed mt-4 */}
+      <DialogContent 
+        className="max-w-3xl w-full bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col p-0"
+        onCloseAutoFocus={(e) => {
+            if (JSON.stringify(draft) !== JSON.stringify(job)) {
+                handleSave();
+            }
+            onCloseDialog?.();
+        }}
+      >
+        <DialogHeader className="p-6 pb-4 border-b border-gray-200 flex flex-row justify-between items-start">
             <div>
-              <b>Role:</b> {job.role}
+                <DialogTitle className="text-2xl font-semibold text-gray-900">{draft.role}</DialogTitle>
+                {draft.company && <DialogDescription className="text-gray-500">{draft.company}</DialogDescription>}
             </div>
-            {(job.expectedSalaryMin || job.expectedSalaryMax) && (
-              <div>
-                <b>Salary:</b> {job.expectedSalaryMin && `₹${job.expectedSalaryMin}`}
-                {job.expectedSalaryMin && job.expectedSalaryMax && " - "}
-                {job.expectedSalaryMax && `₹${job.expectedSalaryMax}`}
-                {" "}
-                {job.salaryFrequency}
-              </div>
-            )}
-            {job.jobUrl && (
-              <div>
-                <b>Job URL:</b>{" "}
-                <a
-                  href={job.jobUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-700 underline"
-                >
-                  {job.jobUrl}
-                </a>
-              </div>
-            )}
-            {job.jobDescription && (
-              <div>
-                <b>Description:</b>
-                <br />
-                <span className="text-sm whitespace-pre-line">{job.jobDescription}</span>
-              </div>
-            )}
-            {job.notes && (
-              <div>
-                <b>Notes:</b>
-                <br />
-                <span className="text-sm whitespace-pre-line">{job.notes}</span>
-              </div>
-            )}
-          </div>
-          {generationError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md flex items-center gap-2 text-red-700"> {/* Removed mt-4 */}
-              <AlertCircle size={16} />
-              <span className="text-sm">{generationError}</span>
+        </DialogHeader>
+        <div className="flex-grow overflow-y-auto p-6 space-y-6 min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1">
+                <h3 className="font-medium text-gray-900">Position</h3>
+                <Input value={draft.role || ''} onChange={e => setDraft({ ...draft, role: e.target.value })} />
             </div>
-          )}
-            </div> {/* Closing the flex-grow overflow-y-auto div */}
-          <div className="flex flex-col gap-3 pt-4 border-t border-gray-200"> {/* Removed mt-6, added pt-4 and border */}
-            <button
-              className={`w-full px-4 py-2 rounded flex items-center justify-center gap-2 ${isGeneratingResume
-                ? 'bg-gray-400 cursor-wait'
-                : 'bg-[#006D77] hover:bg-[#005a66]'} text-white transition-colors`}
-              onClick={async () => {
-                if (!user?.id) {
-                  toast({
-                    title: "Authentication required",
-                    description: "Please sign in to generate a resume",
-                    variant: "destructive"
-                  });
-                  return;
-                }
-
-                setIsGeneratingResume(true);
-                setGenerationError(null);
-
-                try {
-                  const response = await fetch('/api/resume/generate', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      // Include credentials to ensure cookies are sent
-                    },
-                    // This ensures cookies are sent with the request
-                    credentials: 'include',
-                    body: JSON.stringify({
-                      userId: user.id,
-                      jobContext: {
-                        title: job.role,
-                        company: job.company,
-                        description: job.jobDescription || '',
-                        location: job.location,
-                        requirements: '',
-                        salary_range: job.expectedSalaryMin && job.expectedSalaryMax ?
-                          `${job.expectedSalaryMin}-${job.expectedSalaryMax} ${job.salaryFrequency || ''}` : undefined,
-                        job_url: job.jobUrl
-                      },
-                      maxProjects: 4,
-                      targetFormat: 'ats'
-                    })
-                  });
-
-                  const result = await response.json();
-
-                  if (!result.success) {
-                    throw new Error(result.error || 'Failed to generate resume');
-                  }
-                  console.log(result)
-                  setResumeData(result.data); // result should contain pdfBase64, latexSource, etc.
-                  // Generate HTML resume and open modal
-                  try {
-                    const html = generateHTMLResume(
-                      result.data.resume,
-                      result.data.metadata?.profileData || {},
-                      result.data.metadata?.jobRequirements || {}
-                    );
-                    setResumeHtml(html);
-                  } catch (e) {
-                    setResumeHtml('<div style="padding:2em;color:red;">Failed to generate HTML resume.</div>');
-                  }
-                  setResumeModalOpen(true);
-
-                  toast({
-                    title: "Resume generated!",
-                    description: `Tailored for ${job.role} at ${job.company}`,
-                    variant: "default"
-                  });
-
-                } catch (error: unknown) {
-                  console.error('Resume generation error:', error);
-                  const errorMessage = error instanceof Error ? error.message : 'Failed to generate resume';
-                  setGenerationError(errorMessage);
-                  toast({
-                    title: "Resume generation failed",
-                    description: errorMessage,
-                    variant: "destructive"
-                  });
-                } finally {
-                  setIsGeneratingResume(false);
-                }
-              }}
-              disabled={isGeneratingResume}
-            >
-              {isGeneratingResume ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Generating Resume...
-                </>
-              ) : (
-                <>
-                  <FileText size={16} />
-                  {resumeHtml ? 'Regenerate Resume' : 'Generate Resume'}
-                </>
-              )}
-            </button>
-
-            {/* Save/View Resume Button */}
-            {resumeHtml && (
-              <>
-                {!savedResumeId ? (
-                  <button
-                    className={`w-full px-4 py-2 rounded flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white transition-colors ${isSavingResume ? 'opacity-75 cursor-not-allowed' : ''}`}
-                    onClick={async () => {
-                      if (!user || !user.id) {
-                        toast({
-                          title: "Cannot save resume",
-                          description: "You need to be logged in to save the resume.",
-                          variant: "destructive"
-                        });
-                        return;
-                      }
-                      if (!resumeHtml) {
-                        toast({
-                          title: "Cannot save resume",
-                          description: "No resume content to save.",
-                          variant: "destructive"
-                        });
-                        return;
-                      }
-
-                      const resumeTitle = `Resume for ${job.role} at ${job.company} - ${new Date().toLocaleDateString()}`;
-                      setIsSavingResume(true);
-                      try {
-                        const { data, error } = await saveGeneratedHtmlResume(user.id, resumeTitle, resumeHtml);
-                        if (error) throw error;
-                        if (data) {
-                          setSavedResumeId(data.id);
-                          toast({
-                            title: "Resume saved!",
-                            description: "The generated resume has been saved to your profile.",
-                            variant: "default"
-                          });
-                        }
-                      } catch (saveError: any) {
-                        console.error('Failed to save resume:', saveError);
-                        toast({
-                          title: "Failed to save resume",
-                          description: saveError.message || "Could not save the generated resume.",
-                          variant: "destructive"
-                        });
-                      } finally {
-                        setIsSavingResume(false);
-                      }
-                    }}
-                    disabled={isSavingResume}
-                  >
-                    {isSavingResume ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <FileCheck size={16} />
-                        Save Generated Resume
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <a
-                    href={`/resumes/${savedResumeId}`}
-                    className="w-full px-4 py-2 rounded flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white transition-colors"
-                  >
-                    <FileText size={16} />
-                    View Saved Resume
-                  </a>
-                )}
-              </>
-            )}
-
-            <button
-              className={`w-full px-4 py-2 rounded flex items-center justify-center gap-2 ${isGeneratingCoverLetter
-                ? 'bg-gray-400 cursor-wait'
-                : 'bg-[#83C5BE] hover:bg-[#6fa7a1]'} text-white transition-colors`}
-              onClick={() => {
-                toast({
-                  title: "Coming Soon",
-                  description: "Cover letter generation will be available soon!",
-                  variant: "default"
-                });
-              }}
-              disabled={isGeneratingCoverLetter}
-            >
-              {isGeneratingCoverLetter ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Generating Cover Letter...
-                </>
-              ) : (
-                <>
-                  <FileCheck size={16} />
-                  Generate Cover Letter
-                </>
-              )}
-            </button>
-
-            <button
-              className="w-full px-4 py-2 rounded bg-gray-200 text-gray-700 cursor-not-allowed flex items-center justify-center gap-2"
-              disabled
-            >
-              More Actions (Coming Soon)
-            </button>
+            <div className="space-y-1">
+                <h3 className="font-medium text-gray-900">Company</h3>
+                <Input value={draft.company || ''} onChange={e => setDraft({ ...draft, company: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+                <h3 className="font-medium text-gray-900 flex items-center"><MapPin className="w-4 h-4 mr-2 text-gray-500" /> Location</h3>
+                <Input value={draft.location || ''} placeholder="e.g. San Francisco, CA" onChange={e => setDraft({ ...draft, location: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+                <h3 className="font-medium text-gray-900 flex items-center"><Building2 className="w-4 h-4 mr-2 text-gray-500" /> Job URL</h3>
+                <Input value={draft.jobUrl || ''} placeholder="Link to job posting" onChange={e => setDraft({ ...draft, jobUrl: e.target.value })} />
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+          <div className="space-y-2">
+            <h3 className="font-medium text-gray-900">Job Description</h3>
+            <Textarea rows={8} value={draft.jobDescription || ''} onChange={e => setDraft({ ...draft, jobDescription: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-medium text-gray-900">Notes</h3>
+            <Textarea rows={4} value={draft.notes || ''} onChange={e => setDraft({ ...draft, notes: e.target.value })} />
+          </div>
+          
+          <Card className="bg-gray-50/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Resume</CardTitle>
+              <CardDescription>
+                {job.attachedResumeId ? "A resume is attached. You can view it or replace it." : "No resume attached. Upload or generate one."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {job.attachedResumeId && !resumeAction ? (
+                <div className="flex items-center gap-4">
+                  <Button onClick={handleViewAttachedResume} disabled={isLoadingAttachedResume}>
+                    {isLoadingAttachedResume ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />} View Attached Resume
+                  </Button>
+                  <Button variant="outline" onClick={() => setResumeAction('upload')}>Replace</Button>
+                </div>
+              ) : (
+                <div>
+                  {resumeAction === 'upload' ? (
+                    <ResumeUploader onUpload={handleResumeSave} isSaving={isSaving} onCancel={() => setResumeAction(null)} />
+                  ) : resumeAction === 'generate' ? (
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">Generate a new resume based on the job description.</p>
+                      <Button onClick={handleGenerateResume} disabled={isGenerating || isSaving}>
+                        {(isGenerating || isSaving) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isGenerating ? 'Generating...' : isSaving ? 'Saving...' : 'Generate and Save Resume'}
+                      </Button>
+                      <Button variant="ghost" onClick={() => setResumeAction(null)}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-4">
+                      <Button onClick={() => setResumeAction('upload')}>Upload Resume</Button>
+                      <Button onClick={() => setResumeAction('generate')}>Generate Resume</Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </DialogContent>
 
-      {/* Resume Preview Modal */}
       <Dialog open={resumeModalOpen} onOpenChange={setResumeModalOpen}>
-        <DialogContent className="max-w-5xl w-full bg-white rounded-lg shadow-xl max-h-[95vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+        <DialogContent className="max-w-7xl w-full bg-white rounded-lg shadow-xl max-h-[95vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-4">
             <DialogTitle>Resume Preview</DialogTitle>
           </DialogHeader>
-          <DialogClose
-            className="absolute top-6 right-6 text-gray-500 hover:text-gray-700 z-10"
-            onClick={() => setResumeModalOpen(false)}
-            aria-label="Close"
-          >
-            <span aria-hidden="true">&times;</span>
-          </DialogClose>
-          <div className="flex justify-end px-6 py-4 border-b">
-            <Button
-              variant="outline"
-              onClick={async () => {
-                if (!resumeHtml) return;
-                try {
-                  await generatePDFClientSide(resumeHtml, 'resume.pdf');
-                } catch (err) {
-                  toast({ description: 'PDF download failed', variant: 'destructive' });
-                }
-              }}
-              disabled={!resumeHtml}
-            >
-              Download PDF
-            </Button>
-          </div>
-          <div className="flex-grow overflow-y-auto"> {/* This div will scroll */}
-            {resumeHtml && <HTMLResumeViewer html={resumeHtml} />}
+          <div className="flex-grow overflow-y-auto min-h-0">
+            {(attachedResumeHtml || resumeHtml) && <HTMLResumeViewer html={attachedResumeHtml || resumeHtml || ''} />}
           </div>
         </DialogContent>
       </Dialog>

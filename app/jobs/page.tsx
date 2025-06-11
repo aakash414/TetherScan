@@ -1,12 +1,17 @@
 import { JobBoard } from "@/components/job-board"
+import { DecorativeStars } from "@/components/decorative-stars"
 
 export default function JobBoardPage() {
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Job Board</h2>
+    <div className="relative space-y-8">
+      <DecorativeStars />
+      <div>
+        <h2 className="text-4xl font-bold tracking-tight text-[#006D77]">Job Board</h2>
+        <p className="mt-2 text-lg text-muted-foreground">
+          Track and manage your job applications from start to finish.
+        </p>
       </div>
-      <JobBoard />
+      <JobBoard initialJobs={[]} />
     </div>
   )
 }

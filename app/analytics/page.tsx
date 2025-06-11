@@ -9,7 +9,7 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Analytics</h2>
       </div>
-      <StatsCards />
+      <StatsCards jobs={[]} />
       <div className="grid gap-8 md:grid-cols-2">
         <Card>
           <CardHeader>

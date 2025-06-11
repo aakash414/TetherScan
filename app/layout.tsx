@@ -2,7 +2,6 @@ import localFont from 'next/font/local'
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Navbar } from "@/components/navbar"
-import { Sidebar } from "@/components/sidebar"
 import { createClient } from "@/lib/supabase/server"
 import { AuthProvider } from '@/contexts/auth-context'
 
@@ -43,6 +42,11 @@ const gt = localFont({
   variable: '--font-gt'
 })
 
+export const metadata = {
+  title: 'Tether: Your AI Job Application Co-Pilot',
+  description: 'Tether is an AI-powered job application tracker that helps you manage your job search, tailor your resume, and track your progress.',
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -61,14 +65,11 @@ export default function RootLayout({
             enableSystem={false}
             disableTransitionOnChange
           >
-            <div className="min-h-screen bg-gradient-to-br from-[#E8F3F1] via-[#F0F7F5] to-[#F8FAF9]">
+            <div className="relative flex min-h-screen flex-col">
               <Navbar />
-              <div className="flex h-[calc(100vh-4rem)]">
-                <Sidebar />
-                <main className="flex-1 overflow-auto p-8">
-                  {children}
-                </main>
-              </div>
+              <main className="flex-1 overflow-auto p-8 pt-24">
+                {children}
+              </main>
             </div>
           </ThemeProvider>
         </AuthProvider>

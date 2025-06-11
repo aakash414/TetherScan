@@ -1,60 +1,46 @@
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Building2, MapPin } from 'lucide-react'
-import { JobMatchIndicator } from "@/components/job-match-indicator"
-import { JobDetailsDialog } from "@/components/job-details-dialog"
+import { Card, CardContent } from "@/components/ui/card";
+import { Building2, MapPin } from 'lucide-react';
+import { Job } from '@/lib/types';
 
 interface JobCardProps {
-  job: {
-    id: string
-    company: string
-    location: string
-    remote: boolean
-    role: string
-    expectedSalaryMin: string
-    expectedSalaryMax: string
-    salaryFrequency: string
-    jobDescription?: string
-  }
-  showMatchScore?: boolean
-  userId?: string
+  job: Job;
+  isDragging?: boolean;
 }
 
-export function JobCard({ job, showMatchScore = false, userId }: JobCardProps) {
+export function JobCard({ job, isDragging }: JobCardProps) {
+  const formatSalary = (salary: string | number) => {
+    const numericSalary = typeof salary === 'string' ? parseInt(salary, 10) : salary;
+    if (isNaN(numericSalary)) return '';
+    return new Intl.NumberFormat('en-IN').format(numericSalary);
+  }
+
   return (
-    <Card className="bg-white">
-      <CardContent className="p-4">
-        <div className="space-y-2">
+    <Card className={`group h-full bg-white/80 rounded-xl shadow-md card-hover-effect border-transparent hover:border-emerald-500/20 transition-all ${isDragging ? 'shadow-xl ring-2 ring-emerald-400' : ''}`}>
+      <CardContent className="p-6 flex flex-col justify-between h-full">
+        <div className="space-y-3">
           <div>
-            <h4 className="font-semibold text-[#006D77]">{job.role}</h4>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Building2 className="h-4 w-4" />
-              {job.company}
+            <h4 className="font-bold text-lg text-foreground group-hover:text-emerald-600 transition-colors">{job.role}</h4>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+              <Building2 className="h-4 w-4 flex-shrink-0" />
+              <span>{job.company}</span>
             </div>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4" />
-            {job.location} {job.remote && "(Remote)"}
+            <MapPin className="h-4 w-4 flex-shrink-0" />
+            <span>{job.location} {job.remote && "(Remote)"}</span>
           </div>
           {(job.expectedSalaryMin || job.expectedSalaryMax) && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {job.expectedSalaryMin && `₹${job.expectedSalaryMin}`}
-              {job.expectedSalaryMin && job.expectedSalaryMax && " - "}
-              {job.expectedSalaryMax && `₹${job.expectedSalaryMax}`}
-              {" "}
-              {job.salaryFrequency}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+              <span>
+                {job.expectedSalaryMin && `₹${formatSalary(job.expectedSalaryMin)}`}
+                {job.expectedSalaryMin && job.expectedSalaryMax && " - "}
+                {job.expectedSalaryMax && `₹${formatSalary(job.expectedSalaryMax)}`}
+              </span>
+              {job.salaryFrequency && <span className="text-xs text-gray-400 capitalize">{job.salaryFrequency}</span>}
             </div>
           )}
-          {/* Job match indicator temporarily disabled
-          {showMatchScore && userId && (
-            <div className="mt-2">
-              <JobMatchIndicator job={job} userId={userId} />
-            </div>
-          )}
-          */}
-          <JobDetailsDialog job={job} trigger={<button className="mt-2 px-4 py-2 rounded bg-[#006D77] text-white hover:bg-[#005a66] transition-colors">View Details</button>} />
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -1,19 +1,24 @@
-"use client"
 
-import { useAuth } from '@/contexts/auth-context'
-import LandingPage from './landing/page'
-import { DecorativeStars } from "@/components/decorative-stars"
-import { StatsCards } from "@/components/stats-cards"
-import { JobBoard } from "@/components/job-board"
-import { ResumeAnalytics } from "@/components/resume-analytics"
 
-export default function Home() {
-  const { user, loading } = useAuth()
-  
-  if (loading) {
-    return <div>Loading...</div>
+import { JobBoard } from '@/components/job-board'
+import { StatsCards } from '@/components/stats-cards'
+import { DecorativeStars } from '@/components/decorative-stars'
+import { createClient } from '@/lib/supabase/server'
+import { jobsService } from '@/lib/supabase/services/jobs'
+
+// Since LandingPage component is not found, we'll use a placeholder.
+const LandingPage = () => <div className="flex items-center justify-center h-screen"><h1 className="text-2xl">Welcome to TetherScan</h1></div>
+
+export default async function Home() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  let jobs = [];
+  if (user) {
+    const data = await jobsService.getJobs(supabase);
+    jobs = data || [];
   }
-  
+
   return user ? (
     <div className="relative space-y-8">
       <DecorativeStars />
@@ -25,12 +30,10 @@ export default function Home() {
           </p>
         </div>
       </div>
-      <StatsCards />
-      <div className="grid gap-8 lg:grid-cols-2">
-        <JobBoard />
-        <ResumeAnalytics />
+      <StatsCards jobs={jobs} />
+      <div className="grid gap-8">
+        <JobBoard initialJobs={jobs} />
       </div>
     </div>
   ) : <LandingPage />
 }
-
