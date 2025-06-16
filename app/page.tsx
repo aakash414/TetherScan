@@ -5,10 +5,7 @@ import { StatsCards } from '@/components/stats-cards'
 import { DecorativeStars } from '@/components/decorative-stars'
 import { createClient } from '@/lib/supabase/server'
 import { jobsService } from '@/lib/supabase/services/jobs'
-
-// Since LandingPage component is not found, we'll use a placeholder.
-const LandingPage = () => <div className="flex items-center justify-center h-screen"><h1 className="text-2xl">Welcome to TetherScan</h1></div>
-
+import LandingPage from './landing/page'
 export default async function Home() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
