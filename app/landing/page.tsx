@@ -80,7 +80,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button asChild size="lg" className="bg-[#006D77] hover:bg-[#005c66] h-auto py-3 px-8 text-base text-white">
-                  <Link href="/signup">Get Started for Free</Link>
+                  <Link href="/signin">Get Started for Free</Link>
                 </Button>
               </motion.div>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
