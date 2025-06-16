@@ -142,7 +142,7 @@ export default function LandingPage() {
           transition={{ duration: 0.5 }}
         >
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Get Started in 4 Simple Steps</h2>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Get Started in 3 Simple Steps</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
               From profile import to landing the offer, we&apos;ve got you covered.
             </p>
