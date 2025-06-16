@@ -5,7 +5,7 @@ import { ManualProjects } from "@/components/manual-projects"
 
 export default function ProjectsPage() {
   return (
-    <div className="relative space-y-8">
+    <div className="relative space-y-8 p-8">
       <DecorativeStars />
       <div className="flex items-center justify-between">
         <div>

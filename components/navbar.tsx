@@ -34,7 +34,7 @@ export function Navbar() {
 
   return (
     <header className={cn(
-      'fixed top-0 left-0 right-0 z-50 flex justify-center transition-all duration-300 ease-in-out',
+      'static md:fixed top-0 left-0 right-0 z-50 flex justify-center transition-all duration-300 ease-in-out',
       isScrolled ? 'pt-4' : 'pt-8'
     )}>
       <motion.div
@@ -42,7 +42,7 @@ export function Navbar() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 50, damping: 15, delay: 0.2 }}
         className={cn(
-          'transition-all duration-300 ease-in-out w-full max-w-2xl',
+          'transition-all duration-300 ease-in-out max-w-2xl',
           isScrolled ? 'rounded-full shadow-lg border border-[#ede7de]/80 bg-[#ede7de]/60 backdrop-blur-lg' : 'bg-transparent'
         )}
       >
@@ -62,7 +62,7 @@ export function Navbar() {
                       className="w-full justify-start gap-2 text-[#006D77] dark:text-[#83C5BE] hover:bg-[#006c772d] rounded-full"
                     >
                       <route.icon className="h-5 w-5" />
-                      {route.name}
+                      <span className="hidden md:inline">{route.name}</span>
                     </Button>
                   </Link>
                 </motion.div>

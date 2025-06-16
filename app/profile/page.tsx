@@ -4,69 +4,33 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { createClient } from '@/lib/supabase/browser-client'
-import { getUserProfileForResume } from "@/lib/supabase/services/profile";
+import { getAuthenticatedUserProfile } from '@/lib/supabase/services/client/profile-service'
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => {
     const fetchUser = async () => {
+      setLoading(true);
       try {
-        // Get the current authenticated user
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-
-        if (authError || !authUser) {
-          router.push('/signin')
-          return
+        const profile = await getAuthenticatedUserProfile();
+        if (profile) {
+          setUser(profile);
+        } else {
+          router.push('/signin');
         }
-
-        // Fetch user data using the unified profile RPC
-        const { data: userData, error: dbError } = await getUserProfileForResume(authUser.id)
-
-        if (dbError) {
-          console.error('Error fetching user profile:', dbError)
-
-          // If user doesn't exist in our table, create a basic profile
-          if (dbError.code === 'PGRST116') { // Record not found error
-            const newUser = {
-              id: authUser.id,
-              email: authUser.email,
-              name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Anonymous',
-            }
-
-            const supabaseClient = await supabase
-            const { data: insertedUser, error: insertError } = await supabaseClient
-              .from('users')
-              .insert([newUser])
-              .select()
-              .single()
-
-            if (insertError) {
-              console.error('Error creating user:', insertError)
-              return
-            }
-
-            // Fetch the user again from the unified profile RPC
-            const { data: refreshedUser } = await getUserProfileForResume(authUser.id)
-            setUser(refreshedUser)
-          }
-          return
-        }
-
-        setUser(userData)
       } catch (error) {
-        console.error('Error:', error)
+        console.error('Error fetching profile:', error);
+        router.push('/signin');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchUser()
-  }, [supabase, router])
+    fetchUser();
+  }, [router]);
 
   if (loading) {
     return (

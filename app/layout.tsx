@@ -67,10 +67,13 @@ export default function RootLayout({
           >
             <div className="relative flex min-h-screen flex-col">
               <Navbar />
-              <main className="flex-1 overflow-auto p-8 pt-24">
+              <main className="flex-1">
                 {children}
               </main>
             </div>
+            <footer className="text-center py-8 border-t border-gray-300 bg-[#ede7de]">
+              <p className="text-sm text-gray-600">&copy; {new Date().getFullYear()} TetherScan. All rights reserved.</p>
+            </footer>
           </ThemeProvider>
         </AuthProvider>
       </body>

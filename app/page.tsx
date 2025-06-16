@@ -17,7 +17,7 @@ export default async function Home() {
   }
 
   return user ? (
-    <div className="relative space-y-8">
+    <div className="relative space-y-8 px-8 md:pt-12">
       <DecorativeStars />
       <div className="flex items-center justify-between">
         <div>
@@ -28,9 +28,7 @@ export default async function Home() {
         </div>
       </div>
       <StatsCards jobs={jobs} />
-      <div className="grid gap-8">
-        <JobBoard initialJobs={jobs} />
-      </div>
+      <JobBoard initialJobs={jobs} />
     </div>
   ) : <LandingPage />
 }

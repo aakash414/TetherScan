@@ -21,6 +21,7 @@ import {
   upsertProjects,
   upsertVolunteer,
   upsertCertifications,
+  createUser,
 } from '@/lib/supabase/services/client/profile-service';
 import { getUserMasterProfileForClient } from '@/app/actions/user-profile-actions';
 import { mapMasterProfileToUserData } from '@/lib/utils/profile-mapper';
@@ -316,74 +317,54 @@ export default function OnboardingPage() {
   };
 
   const handleGenerate = async () => {
-    setIsGenerating(true)
-    setGenerationProgress(0)
+    setIsGenerating(true);
+    setGenerationProgress(0);
 
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        throw new Error("Not authenticated")
-      }
-
-      setGenerationProgress(10)
-
-      try {
-        // Save or update user data
-        await upsertUserProfile(user, userData);
-        setGenerationProgress(30);
-
-        // Save work experiences
-        if (userData.experiences.length > 0) {
-          await upsertExperiences(user, userData.experiences);
-        }
-
-        setGenerationProgress(50);
-
-        // Save education
-        if (userData.education.length > 0) {
-          await upsertEducation(user, userData.education);
-        }
-
-        setGenerationProgress(60);
-
-        // Save skills
-        if (userData.skills.length > 0) {
-          await upsertSkills(user, userData.skills);
-        }
-
-        setGenerationProgress(70);
-
-        // Save projects
-        if (userData.projects.length > 0) {
-          await upsertProjects(user, userData.projects);
-        }
-
-        setGenerationProgress(80);
-
-        // Save volunteer experience
-        if (userData.volunteer.length > 0) {
-          await upsertVolunteer(user, userData.volunteer);
-        }
-
-        setGenerationProgress(90);
-
-        // Save certifications
-        if (userData.certifications.length > 0) {
-          await upsertCertifications(user, userData.certifications);
-        }
-
-        setGenerationProgress(100);
-        toast.success("Profile created successfully!");
-        router.push("/profile");
-      } catch (error) {
-        console.error("Error saving profile:", error);
-        toast.error("Failed to save profile. Please try again.");
-      } finally {
+        toast.error("You must be logged in to save your profile.");
         setIsGenerating(false);
+        return;
       }
 
-      // Sync GitHub projects if a valid GitHub username is provided
+      // 1. Create user record to prevent redirection loop
+      await createUser(user.id, user.email);
+      await upsertUserProfile(user, userData);
+      setGenerationProgress(20);
+
+      // 2. Upsert all profile data
+      if (userData.experiences.length > 0 && userData.experiences[0].title) {
+        await upsertExperiences(user, userData.experiences);
+      }
+      setGenerationProgress(30);
+
+      if (userData.education.length > 0 && userData.education[0].school) {
+        await upsertEducation(user, userData.education);
+      }
+      setGenerationProgress(40);
+
+      if (userData.skills.length > 0 && userData.skills[0].name) {
+        await upsertSkills(user, userData.skills);
+      }
+      setGenerationProgress(50);
+
+      if (userData.projects.length > 0 && userData.projects[0].name) {
+        await upsertProjects(user, userData.projects);
+      }
+      setGenerationProgress(60);
+
+      if (userData.volunteer.length > 0 && userData.volunteer[0].organization) {
+        await upsertVolunteer(user, userData.volunteer);
+      }
+      setGenerationProgress(70);
+
+      if (userData.certifications.length > 0 && userData.certifications[0].name) {
+        await upsertCertifications(user, userData.certifications);
+      }
+      setGenerationProgress(80);
+
+      // 3. Sync GitHub projects (optional)
       if (userData.github && /^[a-zA-Z0-9-]{1,39}$/.test(userData.github)) {
         try {
           await fetch('/api/github-projects/sync', {
@@ -393,22 +374,24 @@ export default function OnboardingPage() {
               'x-user-id': user.id
             },
             body: JSON.stringify({ user_id: user.id })
-          })
+          });
         } catch (syncErr: any) {
-          console.error('GitHub sync error:', syncErr)
-          toast.error('Could not sync GitHub projects. You can try again from your profile page.')
+          console.error('GitHub sync error:', syncErr);
+          toast.error('Could not sync GitHub projects. You can try again from your profile page.');
         }
       }
 
-      // Redirect to dashboard
-      router.push("/")
+      setGenerationProgress(100);
+      toast.success("Profile created successfully!");
+      router.push("/profile");
+
     } catch (error) {
-      console.error('Error saving profile:', error)
-      toast.error("Failed to create profile. Please try again.")
+      console.error("Error saving profile:", error);
+      toast.error("Failed to save profile. Please try again.");
     } finally {
-    setIsGenerating(false)
+      setIsGenerating(false);
     }
-  }
+  };
 
   const completeLater = async () => {
     try {
@@ -417,6 +400,8 @@ export default function OnboardingPage() {
       if (!user) {
         throw new Error("Not authenticated")
       }
+
+      await createUser(user.id, user.email);
 
       // Only save essential information
       const { error: userError } = await supabase.from('users')
@@ -618,10 +603,12 @@ export default function OnboardingPage() {
     return dateStr;
   };
 
+
+
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-[#E8F3F1] via-[#F0F7F5] to-[#F8FAF9] p-8">
       <DecorativeStars />
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-4xl pt-24">
         <h1 className="mb-8 text-4xl font-bold text-[#006D77] animate-fade-in">Welcome to JobTrackr</h1>
         <div className="rounded-lg bg-white p-8 shadow-lg animate-slide-up">
           <h2 className="mb-6 text-2xl font-semibold text-[#006D77]">Let&apos;s set up your profile</h2>
@@ -1142,7 +1129,7 @@ export default function OnboardingPage() {
               disabled={isGenerating}
             >
               {isGenerating ? (
-                <span className="flex items-center">
+                <span className="flex items-center justify-center">
                   <svg
                     className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
                     xmlns="http://www.w3.org/2000/svg"
@@ -1163,14 +1150,13 @@ export default function OnboardingPage() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Generating Profile...
+                  Saving Profile...
                 </span>
               ) : (
-                "Create Profile"
+                "Complete Profile"
               )}
             </Button>
           </div>
-
           {isGenerating && (
             <div className="mt-4">
               <Progress value={generationProgress} className="w-full" />

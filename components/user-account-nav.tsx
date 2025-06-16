@@ -51,16 +51,10 @@ export function UserAccountNav({ user }: { user: User | null }) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/dashboard")}>
-          Dashboard
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/profile")}>
+        {/* <DropdownMenuItem onClick={() => router.push("/profile")}>
           Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/settings")}>
-          Settings
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator /> */}
         <DropdownMenuItem onClick={handleSignOut}>
           Sign out
         </DropdownMenuItem>

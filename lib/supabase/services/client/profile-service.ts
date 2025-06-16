@@ -2,8 +2,20 @@
 
 import { createClient } from '../../browser-client';
 import { UserData } from '@/types/user';
+import { toast } from "react-toastify";
+import { getUserProfileForResume } from '../profile';
 
 const supabase = createClient();
+
+export async function createUser(userId: string, email: string | undefined) {
+  try {
+    const { error } = await supabase.from('users').insert({ id: userId, email: email });
+    if (error) throw error;
+  } catch (error) {
+    toast.error('Error creating user profile.');
+    console.error('Error creating user:', error);
+  }
+}
 
 type WithUserId<T> = T & { user_id: string };
 
@@ -274,4 +286,21 @@ export async function upsertCertifications(user: any, certifications: UserData['
     console.error('Error upserting certifications:', error);
     throw error;
   }
+}
+
+export async function getAuthenticatedUserProfile() {
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !authUser) {
+    return null;
+  }
+
+  const { data: userData, error: dbError } = await getUserProfileForResume(authUser.id);
+
+  if (dbError) {
+    console.error('Error fetching user profile:', dbError);
+    return null;
+  }
+
+  return userData;
 }
