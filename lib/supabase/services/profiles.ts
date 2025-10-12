@@ -78,7 +78,7 @@ export const profilesService = {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single()
     
     if (error) throw error
@@ -89,7 +89,7 @@ export const profilesService = {
     const { data, error } = await supabase
       .from('users')
       .upsert({
-        id: userId,
+        user_id: userId,
         ...profileData,
         updated_at: new Date().toISOString()
       })
@@ -103,7 +103,7 @@ export const profilesService = {
   // Experience operations
   async getExperiences(supabase: SupabaseClient<Database>, userId: string) {
     const { data, error } = await supabase
-      .from('experiences')
+      .from('work_experience')
       .select('*')
       .eq('user_id', userId)
       .order('start_date', { ascending: false })
@@ -114,13 +114,18 @@ export const profilesService = {
 
   async upsertExperiences(supabase: SupabaseClient<Database>, userId: string, experiences: ExperienceData[]) {
     const experiencesToUpsert = experiences.map(exp => ({
-      ...exp,
+      id: exp.id,
       user_id: userId,
+      company_name: exp.company,
+      role: exp.title,
+      start_date: exp.start_date,
+      end_date: exp.end_date,
+      description: exp.description,
       updated_at: new Date().toISOString()
     }))
 
     const { data, error } = await supabase
-      .from('experiences')
+      .from('work_experience')
       .upsert(experiencesToUpsert)
       .select()
     
@@ -142,8 +147,15 @@ export const profilesService = {
 
   async upsertEducation(supabase: SupabaseClient<Database>, userId: string, education: EducationData[]) {
     const educationToUpsert = education.map(edu => ({
-      ...edu,
+      id: edu.id,
       user_id: userId,
+      institution_name: edu.school,
+      degree: edu.degree,
+      field_of_study: edu.field,
+      start_date: edu.start_date,
+      end_date: edu.end_date,
+      grade: edu.grade,
+      description: edu.description,
       updated_at: new Date().toISOString()
     }))
 
@@ -156,10 +168,10 @@ export const profilesService = {
     return data
   },
 
-  // Skills operations
+  // Skills operations (using the view we created)
   async getSkills(supabase: SupabaseClient<Database>, userId: string) {
     const { data, error } = await supabase
-      .from('skills')
+      .from('user_skills_view')
       .select('*')
       .eq('user_id', userId)
       .order('name')
@@ -169,18 +181,49 @@ export const profilesService = {
   },
 
   async upsertSkills(supabase: SupabaseClient<Database>, userId: string, skills: SkillData[]) {
-    const skillsToUpsert = skills.map(skill => ({
-      ...skill,
-      user_id: userId
-    }))
-
-    const { data, error } = await supabase
-      .from('skills')
-      .upsert(skillsToUpsert)
-      .select()
+    // For skills, we need to work with the master_skills and user_skills tables
+    const results = []
     
-    if (error) throw error
-    return data
+    for (const skill of skills) {
+      // First, ensure the skill exists in master_skills
+      let { data: masterSkill, error: masterError } = await supabase
+        .from('master_skills')
+        .select('id')
+        .eq('name', skill.name)
+        .single()
+      
+      if (masterError && masterError.code === 'PGRST116') {
+        // Skill doesn't exist, create it
+        const { data: newSkill, error: createError } = await supabase
+          .from('master_skills')
+          .insert({ name: skill.name })
+          .select('id')
+          .single()
+        
+        if (createError) throw createError
+        masterSkill = newSkill
+      } else if (masterError) {
+        throw masterError
+      }
+      
+      // Now upsert the user skill
+      const { data, error } = await supabase
+        .from('user_skills')
+        .upsert({
+          id: skill.id,
+          user_id: userId,
+          skill_id: masterSkill.id,
+          proficiency: skill.proficiency === 'advanced' ? 'expert' : skill.proficiency,
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      results.push(data)
+    }
+    
+    return results
   },
 
   // Projects operations
@@ -214,7 +257,7 @@ export const profilesService = {
   // Volunteer operations
   async getVolunteer(supabase: SupabaseClient<Database>, userId: string) {
     const { data, error } = await supabase
-      .from('volunteer')
+      .from('volunteer_experience')
       .select('*')
       .eq('user_id', userId)
       .order('start_date', { ascending: false })
@@ -225,13 +268,18 @@ export const profilesService = {
 
   async upsertVolunteer(supabase: SupabaseClient<Database>, userId: string, volunteer: VolunteerData[]) {
     const volunteerToUpsert = volunteer.map(vol => ({
-      ...vol,
+      id: vol.id,
       user_id: userId,
+      organization_name: vol.organization,
+      role: vol.role,
+      start_date: vol.start_date,
+      end_date: vol.end_date,
+      description: vol.description,
       updated_at: new Date().toISOString()
     }))
 
     const { data, error } = await supabase
-      .from('volunteer')
+      .from('volunteer_experience')
       .upsert(volunteerToUpsert)
       .select()
     
@@ -253,8 +301,14 @@ export const profilesService = {
 
   async upsertCertifications(supabase: SupabaseClient<Database>, userId: string, certifications: CertificationData[]) {
     const certificationsToUpsert = certifications.map(cert => ({
-      ...cert,
+      id: cert.id,
       user_id: userId,
+      certification_name: cert.name,
+      issuing_organization: cert.issuer,
+      issue_date: cert.issue_date,
+      expiry_date: cert.expiry_date,
+      certification_id: cert.certification_id,
+      certification_url: cert.certification_url,
       updated_at: new Date().toISOString()
     }))
 
@@ -320,10 +374,9 @@ export const profilesService = {
     const { data, error } = await supabase
       .from('users')
       .upsert({
-        id: userId,
+        user_id: userId,
         email,
-        name: name || email.split('@')[0],
-        role: 'user'
+        name: name || email.split('@')[0]
       })
       .select()
       .single()

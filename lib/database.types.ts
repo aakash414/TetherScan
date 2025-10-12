@@ -11,48 +11,63 @@ export type Database = {
     Tables: {
       users: {
         Row: {
-          id: string
-          email: string
-          name: string
-          role: string
+          user_id: string
+          name: string | null
+          email: string | null
           github_username: string | null
           linkedin_id: string | null
           portfolio_url: string | null
           bio: string | null
           profile_image: string | null
+          education_data: Json
+          work_experience_data: Json
+          volunteer_experience_data: Json
+          certifications_data: Json
+          projects_data: Json
+          summary: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
-          id: string
-          email: string
-          name: string
-          role?: string
+          user_id: string
+          name?: string | null
+          email?: string | null
           github_username?: string | null
           linkedin_id?: string | null
           portfolio_url?: string | null
           bio?: string | null
           profile_image?: string | null
+          education_data?: Json
+          work_experience_data?: Json
+          volunteer_experience_data?: Json
+          certifications_data?: Json
+          projects_data?: Json
+          summary?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          email?: string
-          name?: string
-          role?: string
+          user_id?: string
+          name?: string | null
+          email?: string | null
           github_username?: string | null
           linkedin_id?: string | null
           portfolio_url?: string | null
           bio?: string | null
           profile_image?: string | null
+          education_data?: Json
+          work_experience_data?: Json
+          volunteer_experience_data?: Json
+          certifications_data?: Json
+          projects_data?: Json
+          summary?: string | null
           created_at?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "users_id_fkey"
-            columns: ["id"]
+            foreignKeyName: "user_profiles_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -62,15 +77,16 @@ export type Database = {
       jobs: {
         Row: {
           id: string
-          user_id: string
+          user_id: string | null
           company: string
           role: string
           location: string | null
           remote: boolean
           status: 'wishlist' | 'applied' | 'interviewing' | 'offered' | 'rejected'
+          resume_id: string | null
           expected_salary_min: string | null
           expected_salary_max: string | null
-          salary_frequency: 'hourly' | 'monthly' | 'yearly'
+          salary_frequency: string | null
           job_url: string | null
           job_description: string | null
           notes: string | null
@@ -82,15 +98,16 @@ export type Database = {
         }
         Insert: {
           id?: string
-          user_id: string
+          user_id?: string | null
           company: string
           role: string
           location?: string | null
-          remote?: boolean
-          status?: 'wishlist' | 'applied' | 'interviewing' | 'offered' | 'rejected'
+          remote: boolean
+          status: 'wishlist' | 'applied' | 'interviewing' | 'offered' | 'rejected'
+          resume_id?: string | null
           expected_salary_min?: string | null
           expected_salary_max?: string | null
-          salary_frequency?: 'hourly' | 'monthly' | 'yearly'
+          salary_frequency?: string | null
           job_url?: string | null
           job_description?: string | null
           notes?: string | null
@@ -102,15 +119,16 @@ export type Database = {
         }
         Update: {
           id?: string
-          user_id?: string
+          user_id?: string | null
           company?: string
           role?: string
           location?: string | null
           remote?: boolean
           status?: 'wishlist' | 'applied' | 'interviewing' | 'offered' | 'rejected'
+          resume_id?: string | null
           expected_salary_min?: string | null
           expected_salary_max?: string | null
-          salary_frequency?: 'hourly' | 'monthly' | 'yearly'
+          salary_frequency?: string | null
           job_url?: string | null
           job_description?: string | null
           notes?: string | null
@@ -122,23 +140,16 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "jobs_user_id_fkey"
+            foreignKeyName: "job_applications_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "jobs_attached_resume_fkey"
-            columns: ["attached_resume_id"]
-            isOneToOne: false
-            referencedRelation: "resumes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "jobs_generated_resume_fkey"
-            columns: ["generated_resume_id"]
-            isOneToOne: false
+            foreignKeyName: "job_applications_resume_id_fkey"
+            columns: ["resume_id"]
+            isOneToOne: true
             referencedRelation: "resumes"
             referencedColumns: ["id"]
           }
@@ -149,10 +160,12 @@ export type Database = {
           id: string
           user_id: string
           title: string
+          extracted_data: string | null
+          job_id: string | null
           content: Json | null
           html_content: string | null
           pdf_url: string | null
-          is_default: boolean
+          is_default: boolean | null
           created_at: string
           updated_at: string
         }
@@ -160,10 +173,12 @@ export type Database = {
           id?: string
           user_id: string
           title: string
+          extracted_data?: string | null
+          job_id?: string | null
           content?: Json | null
           html_content?: string | null
           pdf_url?: string | null
-          is_default?: boolean
+          is_default?: boolean | null
           created_at?: string
           updated_at?: string
         }
@@ -171,10 +186,12 @@ export type Database = {
           id?: string
           user_id?: string
           title?: string
+          extracted_data?: string | null
+          job_id?: string | null
           content?: Json | null
           html_content?: string | null
           pdf_url?: string | null
-          is_default?: boolean
+          is_default?: boolean | null
           created_at?: string
           updated_at?: string
         }
@@ -184,6 +201,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resumes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           }
         ]
@@ -224,7 +248,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "experiences_user_id_fkey"
+            foreignKeyName: "work_experience_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -391,7 +415,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "volunteer_user_id_fkey"
+            foreignKeyName: "volunteer_experience_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
