@@ -1,8 +1,9 @@
 import { type CookieOptions, createServerClient as _createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
+import type { Database } from '@/lib/database.types';
 
-type SupabaseClient = ReturnType<typeof _createServerClient>;
+type SupabaseClient = ReturnType<typeof _createServerClient<Database>>;
 
 export function createSupabaseServerClient(cookieStore: ReadonlyRequestCookies | Promise<ReadonlyRequestCookies>): SupabaseClient | Promise<SupabaseClient> {
   // Handle case where cookies() returns a Promise
@@ -13,7 +14,7 @@ export function createSupabaseServerClient(cookieStore: ReadonlyRequestCookies |
     console.error('CRITICAL: cookieStore is undefined in createSupabaseServerClient');
     throw new Error('cookieStore is undefined in createSupabaseServerClient. This should not happen.');
   }
-  return _createServerClient(
+  return _createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

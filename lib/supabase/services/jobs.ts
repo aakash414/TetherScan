@@ -1,8 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Job, JobFormData } from '@/lib/types'
+import type { Database } from '@/lib/database.types'
 
 export const jobsService = {
-  async createJob(supabase: SupabaseClient, job: JobFormData) {
+  async createJob(supabase: SupabaseClient<Database>, job: JobFormData) {
     // Log the job payload
     console.log('[jobsService.createJob] Payload:', job)
     // Log Supabase env vars
@@ -29,7 +30,7 @@ export const jobsService = {
     }
   },
 
-  async getJobs(supabase: SupabaseClient) {
+  async getJobs(supabase: SupabaseClient<Database>) {
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
@@ -37,7 +38,7 @@ export const jobsService = {
     if (error) throw error
     return data
   },
-  async updateJob(supabase: SupabaseClient, jobId: string, updates: Partial<Job>) {
+  async updateJob(supabase: SupabaseClient<Database>, jobId: string, updates: Partial<Job>) {
     const { data, error } = await supabase
       .from('jobs')
       .update(updates)
